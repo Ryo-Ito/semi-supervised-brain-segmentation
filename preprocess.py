@@ -1,10 +1,10 @@
 import argparse
+import json
 import os
 
 from dipy.align.reslice import reslice
 import nibabel as nib
 import numpy as np
-import pandas as pd
 from scipy.ndimage.filters import gaussian_filter
 import SimpleITK as sitk
 
@@ -68,11 +68,46 @@ def main():
 
     if not os.path.exists(args.output_directory):
         os.makedirs(args.output_directory)
+
+    output_folder = os.path.join(args.output_directory, args.template)
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
+    filedict = {"subject": args.template}
+
+    filename = args.template + args.image_suffix
+    outputfile = os.path.join(output_folder, filename)
+    filedict["image"] = outputfile
+    preprocess(
+        os.path.join(args.input_directory, args.template, filename),
+        outputfile,
+        order=1)
+
+    filename = args.template + args.label_suffix
+    outputfile = os.path.join(output_folder, filename)
+    filedict["label"] = outputfile
+    preprocess(
+        os.path.join(args.input_directory, args.template, filename),
+        outputfile,
+        order=0)
+
+    dataset_list.append(filedict)
+
     for subject in args.subjects:
         output_folder = os.path.join(args.output_directory, subject)
         if not os.path.exists(output_folder):
             os.makedirs(output_folder)
         filedict = {"subject": subject}
+
+        cmd = "ANTS 3 -m PR[{0}, {1}, 1, 2] -i 50x20x10 -t SyN[0.3] -r Gauss[3,0.5] -o tmp".format(os.path.join(args.input_directory, subject, subject + args.image_suffix), os.path.join(args.input_directory, args.template, args.template + args.image_suffix))
+        os.system(cmd)
+        cmd = (
+            "antsApplyTransforms -d 3 -i {} -r {} -o label_tmp.nii.gz -t tmpAffine.txt tmpWarp.nii.gz -n NearestNeighbor"
+            .format(
+                os.path.join(args.input_directory, args.template, args.template + args.label_suffix),
+                os.path.join(args.input_directory, subject, subject + args.image_suffix),
+            )
+        )
+        os.system(cmd)
 
         filename = subject + args.image_suffix
         outputfile = os.path.join(output_folder, filename)
@@ -81,4 +116,22 @@ def main():
             os.path.join(args.input_directory, subject, filename),
             outputfile,
             order=1)
-        cmd = "ANTS 3 -m PR[] -i 50x20x10 -t Syn[0.3] -r Gauss[3,0.5]"
+
+        filename = subject + args.label_suffix
+        outputfile = os.path.join(output_folder, filename)
+        filedict["label"] = outputfile
+        preprocess(
+            "label_tmp.nii.gz",
+            outputfile,
+            order=0)
+
+        dataset_list.append(filedict)
+
+    dataset["data"] = dataset_list
+
+    with open(args.output_file, "w") as f:
+        json.dump(dataset, f)
+
+
+if __name__ == '__main__':
+    main()
