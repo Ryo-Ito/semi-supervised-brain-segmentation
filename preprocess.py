@@ -35,6 +35,17 @@ def preprocess(inputfile, outputfile, order=0):
     nib.save(img, outputfile)
 
 
+def onehot_encode(inputfile, outputfile):
+    img = nib.load(inputfile)
+    data = img.get_data()
+    labels = np.unique(data)
+    onehot = []
+    for label in labels:
+        onehot.append((data == label).astype(np.float32))
+    onehot = np.stack(onehot)
+    nib.save(nib.Nifti1Image(onehot, img.affine), outputfile)
+
+
 def main():
     parser = argparse.ArgumentParser(description="preprocess dataset")
     parser.add_argument(
@@ -138,7 +149,7 @@ def main():
                 subject + "_estimated" + args.label_suffix
             )
             filedict["label_estimated"] = outputfile2
-            os.system("cp {} {}".format(outputfile, outputfile2))
+            onehot_encode(outputfile, outputfile2)
 
         dataset_list.append(filedict)
 
