@@ -65,14 +65,14 @@ for i in range(args.iteration):
     image, label = load.sample(train_df, args.n_batch, args.shape)
     x_train = xp.asarray(image)
     y_train = xp.asarray(label)
-    logits = vrn(x_train, train=True)
+    probs = vrn(x_train, train=True)
     loss = 0
-    for logit in logits:
-        loss += F.sum(F.log(F.softmax(logit)) * y_train)
+    for p in probs:
+        loss += F.sum(F.log(p) * y_train)
     loss.backward()
     optimizer.update()
     if i % args.display_step == 0:
-        accuracy = [float(F.accuracy(logit, y_train).data) for logit in logits]
+        accuracy = [float(F.accuracy(p, y_train).data) for p in probs]
         print("step {0:5d}, acc_c1 {1[0]:.02f}, acc_c2 {1[1]:.02f}, acc_c3 {1[2]:.02f}, acc_c4 {1[3]:.02f}, acc {1[4]:.02f}".format(i, accuracy))
 
 vrn.to_cpu()

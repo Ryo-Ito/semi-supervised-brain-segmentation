@@ -74,7 +74,7 @@ class VoxResNet(chainer.Chain):
         -------
         proba: (batch_size, n_classes, xlen, ylen, zlen) ndarray
             probability of each voxel belonging each class
-            elif train=True, returns tuple of logits
+            elif train=True, returns list of proba
         """
         h = self.conv1a(x)
         h = F.relu(self.bnorm1a(h, test=not train))
@@ -105,6 +105,6 @@ class VoxResNet(chainer.Chain):
 
         c = c1 + c2 + c3 + c4
         if train:
-            return (c1, c2, c3, c4, c)
+            return [F.softmax(c1), F.softmax(c2), F.softmax(c3), F.softmax(c4), F.softmax(c)]
         else:
             return F.softmax(c)
