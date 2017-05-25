@@ -43,6 +43,7 @@ def onehot_encode(inputfile, outputfile):
     for label in labels:
         onehot.append((data == label).astype(np.float32))
     onehot = np.stack(onehot)
+    onehot = onehot.transpose(1, 2, 3, 0)
     nib.save(nib.Nifti1Image(onehot, img.affine), outputfile)
 
 
@@ -137,7 +138,7 @@ def main():
             )
             os.system(cmd)
 
-            filename = subject + "_warped" + args.label_suffix
+            filename = subject + "_segTRI_warped.nii.gz"
             outputfile = os.path.join(output_folder, filename)
             filedict["label_warped"] = outputfile
             preprocess(
@@ -146,7 +147,7 @@ def main():
                 order=0)
             outputfile2 = os.path.join(
                 output_folder,
-                subject + "_estimated" + args.label_suffix
+                subject + "_segTRI_estimate.nii.gz"
             )
             filedict["label_estimated"] = outputfile2
             onehot_encode(outputfile, outputfile2)

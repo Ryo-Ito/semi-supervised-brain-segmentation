@@ -63,6 +63,7 @@ def sample(df, n, shape):
         image_patch = image[slices]
         label_patch = label[slices]
         image_patch = image_patch.transpose(3, 0, 1, 2)
+        label_patch = label_patch.transpose(3, 0, 1, 2)
         images.append(image_patch)
         labels.append(label_patch)
     images = np.array(images)
