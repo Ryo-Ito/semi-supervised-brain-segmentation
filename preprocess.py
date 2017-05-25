@@ -152,6 +152,14 @@ def main():
             )
             filedict["label"] = outputfile2
             onehot_encode(outputfile, outputfile2)
+        else:
+            filename = subject + args.label_suffix
+            outputfile = os.path.join(output_folder, filename)
+            filedict["label"] = outputfile
+            preprocess(
+                os.path.join(args.input_directory, subject, filename),
+                outputfile,
+                order=0)
 
         dataset_list.append(filedict)
 
