@@ -103,6 +103,7 @@ def main():
             os.path.join(args.input_directory, args.template, filename),
             outputfile,
             order=0)
+        onehot_encode(outputfile, outputfile)
 
         dataset_list.append(filedict)
 
@@ -149,7 +150,7 @@ def main():
                 output_folder,
                 subject + "_segTRI_estimate.nii.gz"
             )
-            filedict["label_estimated"] = outputfile2
+            filedict["label"] = outputfile2
             onehot_encode(outputfile, outputfile2)
 
         dataset_list.append(filedict)

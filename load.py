@@ -46,7 +46,7 @@ def sample(df, n, shape):
     assert N >= n, "n should be smaller than or equal to " + str(N)
     indices = np.random.choice(N, n, replace=False)
     image_files = df["image"][indices]
-    label_files = df["label_estimated"][indices]
+    label_files = df["label"][indices]
     images = []
     labels = []
     for image_file, label_file in zip(image_files, label_files):
