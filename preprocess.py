@@ -9,7 +9,7 @@ from scipy.ndimage.filters import gaussian_filter
 import SimpleITK as sitk
 
 
-def preprocess(inputfile, outputfile, order=0, df=None):
+def preprocess(inputfile, outputfile, order=0):
     img = nib.load(inputfile)
     data = img.get_data()
     affine = img.affine
@@ -109,7 +109,13 @@ def main():
             order=1)
 
         if args.template is not None:
-            cmd = "ANTS 3 -m PR[{0}, {1}, 1, 2] -i 50x20x10 -t SyN[0.3] -r Gauss[3,0.5] -o tmp".format(os.path.join(args.input_directory, subject, subject + args.image_suffix), os.path.join(args.input_directory, args.template, args.template + args.image_suffix))
+            cmd = (
+                "ANTS 3 -m PR[{0}, {1}, 1, 2] -i 50x20x10 -t SyN[0.3] -r Gauss[3,0.5] -o tmp"
+                .format(
+                    os.path.join(args.input_directory, subject, subject + args.image_suffix),
+                    os.path.join(args.input_directory, args.template, args.template + args.image_suffix)
+                )
+            )
             os.system(cmd)
             cmd = (
                 "antsApplyTransforms -d 3 -i {} -r {} -o label_tmp.nii.gz -t tmpAffine.txt tmpWarp.nii.gz -n NearestNeighbor"
@@ -120,13 +126,19 @@ def main():
             )
             os.system(cmd)
 
-            filename = subject + args.label_suffix
+            filename = subject + "_warped" + args.label_suffix
             outputfile = os.path.join(output_folder, filename)
-            filedict["label"] = outputfile
+            filedict["label_warped"] = outputfile
             preprocess(
                 "label_tmp.nii.gz",
                 outputfile,
                 order=0)
+            outputfile2 = os.path.join(
+                output_folder,
+                subject + "_estimated" + args.label_suffix
+            )
+            filedict["label_estimated"] = outputfile2
+            os.system("cp {} {}".format(outputfile, outputfile2))
 
         dataset_list.append(filedict)
 
