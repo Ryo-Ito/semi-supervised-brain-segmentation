@@ -2,15 +2,45 @@ import argparse
 import json
 import os
 
+import nibabel as nib
 import numpy as np
 import pandas as pd
 
+from load import load_nifti
+
 
 def update_label(df, noise):
-    return None
 
-def update_noise(df):
-    return None
+    for label_path, label_warped_path, subject in zip(df["label"], df["label_warped"], df["subject"]):
+        if label_warped_path == label_warped_path:
+            proba, affine = load_nifti(
+                os.path.join(
+                    os.path.dirname(label_path),
+                    subject + "_segTRI_proba.nii.gz"
+                ),
+                True
+            )
+            noisy_label = load_nifti(label_warped_path)
+            proba *= noise[noisy_label]
+            proba /= np.sum(proba, axis=-1, keepdims=True)
+            nib.save(nib.Nifti1Image(proba, affine), label_path)
+
+
+def update_noise(df, n_classes):
+    noise_matrix = np.zeros((n_classes, n_classes))
+    proba = []
+    label_warped = []
+    for label_path, label_warped_path in zip(df["label"], df["label_warped"]):
+        if label_warped_path == label_warped_path:
+            label_warped.append(load_nifti(label_warped_path))
+            proba.append(load_nifti(label_path))
+    proba = np.asarray(proba)
+    label_warped = np.asarray(label_warped)
+    for j in range(n_classes):
+        indices = np.where(label_warped == j)
+        for i in range(n_classes):
+            noise_matrix[j, i] = np.sum(proba[indices, i]) / np.sum(proba[:, :, :, :, i])
+    return noise_matrix
 
 
 parser = argparse.ArgumentParser(description="train VoxResNet with EM alg.")
@@ -56,14 +86,16 @@ n_classes = dataset["n_classes"]
 
 cmd_train_network = (
     "python train.py "
-    "-i {} -s {} -g {} -f {} --n_batch {} --shape {} -r {} -w {} "
+    "-i {} -s {} -g {} -f {} --n_batch {} --shape {} {} {} -r {} -w {} "
     .format(
         args.iteration,
         args.display_step,
         args.gpu,
         args.input_file,
         args.n_batch,
-        args.shape,
+        args.shape[0],
+        args.shape[1],
+        args.shape[2],
         args.learning_rate,
         args.weight_decay
     )
@@ -89,7 +121,7 @@ for i in range(1, args.em_step + 1):
     update_label(train_df, noise_matrix)
 
     # M step
-    noise_matrix = update_noise(train_df)
+    noise_matrix = update_noise(train_df, n_classes)
     os.system(cmd_train_network + "-o weight_{}.npz".format(i))
 
 os.system("mv weight_{}.npz {}".format(args.em_step, args.out))
