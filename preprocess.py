@@ -152,6 +152,13 @@ def main():
             )
             filedict["label"] = outputfile2
             onehot_encode(outputfile, outputfile2)
+
+            filename = subject + args.label_suffix
+            outputfile = os.path.join(output_folder, filename)
+            preprocess(
+                os.path.join(args.input_directory, subject, filename),
+                outputfile,
+                order=0)
         else:
             filename = subject + args.label_suffix
             outputfile = os.path.join(output_folder, filename)
@@ -167,6 +174,8 @@ def main():
 
     with open(args.output_file, "w") as f:
         json.dump(dataset, f)
+
+    os.system("rm *tmp*")
 
 
 if __name__ == '__main__':
