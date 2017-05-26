@@ -13,17 +13,16 @@ def update_label(df, noise):
 
     for label_path, label_warped_path, subject in zip(df["label"], df["label_warped"], df["subject"]):
         if label_warped_path == label_warped_path:
-            proba, affine = load_nifti(
+            proba = load_nifti(
                 os.path.join(
                     os.path.dirname(label_path),
                     subject + "_segTRI_proba.nii.gz"
-                ),
-                True
+                )
             )
-            noisy_label = load_nifti(label_warped_path)
+            noisy_label, affine = load_nifti(label_warped_path, with_affine=True)
             proba *= noise[noisy_label]
             proba /= np.sum(proba, axis=-1, keepdims=True)
-            nib.save(nib.Nifti1Image(proba, affine), label_path)
+            nib.save(nib.Nifti1Image(proba.astype(np.float32), affine), label_path)
 
 
 def update_noise(df, n_classes):
@@ -117,7 +116,7 @@ for i in range(1, args.em_step + 1):
     print("EM step {0:02d}".format(i))
 
     # E step
-    os.system(cmd_segment_proba + "-m weight_{0}.npz".format(i))
+    os.system(cmd_segment_proba + "-m weight_{}.npz".format(i - 1))
     update_label(train_df, noise_matrix)
 
     # M step
