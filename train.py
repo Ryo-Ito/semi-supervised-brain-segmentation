@@ -45,7 +45,7 @@ print(args)
 
 with open(args.input_file) as f:
     dataset = json.load(f)
-train_df = pd.DataFram(dataset["data"])
+train_df = pd.DataFrame(dataset["data"])
 
 vrn = VoxResNet(dataset["in_channels"], dataset["n_classes"])
 if args.gpu >= 0:
@@ -57,14 +57,14 @@ else:
 
 optimizer = ch.optimizers.Adam(alpha=args.learning_rate)
 optimizer.use_cleargrads()
-optimizer.setup()
+optimizer.setup(vrn)
 optimizer.add_hook(ch.optimizer.WeightDecay(args.weight_decay))
 
 for i in range(args.iteration):
     vrn.cleargrads()
-    image, label = load.sample(train_df, args.n_batch, args.shape)
+    image, proba = load.sample(train_df, args.n_batch, args.shape)
     x_train = xp.asarray(image)
-    y_train = xp.asarray(label)
+    y_train = xp.asarray(proba)
     probs = vrn(x_train, train=True)
     loss = 0
     for p in probs:
@@ -72,7 +72,9 @@ for i in range(args.iteration):
     loss.backward()
     optimizer.update()
     if i % args.display_step == 0:
-        accuracy = [float(F.accuracy(p, y_train).data) for p in probs]
+        label = np.argmax(proba, axis=1).astype(np.int32)
+        label = xp.asarray(label)
+        accuracy = [float(F.accuracy(p, label).data) for p in probs]
         print("step {0:5d}, acc_c1 {1[0]:.02f}, acc_c2 {1[1]:.02f}, acc_c3 {1[2]:.02f}, acc_c4 {1[3]:.02f}, acc {1[4]:.02f}".format(i, accuracy))
 
 vrn.to_cpu()
