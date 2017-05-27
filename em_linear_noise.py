@@ -26,19 +26,22 @@ def update_label(df, noise):
 
 
 def update_noise(df, n_classes):
-    noise_matrix = np.zeros((n_classes, n_classes))
-    proba = []
-    label_warped = []
+    numerator = np.zeros((n_classes, n_classes))
+    denominator = np.zeros_like(numerator)
+
     for label_path, label_warped_path in zip(df["label"], df["label_warped"]):
+        print(label_path)
         if label_warped_path == label_warped_path:
-            label_warped.append(load_nifti(label_warped_path))
-            proba.append(load_nifti(label_path))
-    proba = np.asarray(proba)
-    label_warped = np.asarray(label_warped)
-    for j in range(n_classes):
-        indices = np.where(label_warped == j)
-        for i in range(n_classes):
-            noise_matrix[j, i] = np.sum(proba[indices, i]) / np.sum(proba[:, :, :, :, i])
+            label_warped = load_nifti(label_warped_path)
+            proba = load_nifti(label_path)
+
+            for j in range(n_classes):
+                indices = np.where(label_warped == j)
+                for i in range(n_classes):
+                    numerator[j, i] += np.sum(proba[indices, i])
+                    denominator[j, i] += np.sum(proba[:, :, :, i])
+
+    noise_matrix = numerator / denominator
     return noise_matrix
 
 
@@ -76,7 +79,7 @@ parser.add_argument(
     help="number of EM steps, default=5"
 )
 args = parser.parse_args()
-print(args)
+# print(args)
 
 with open(args.input_file) as f:
     dataset = json.load(f)
@@ -103,20 +106,22 @@ cmd_train_network = (
 # --output_suffix -o and --model -m are missing
 cmd_segment_proba = (
     "python segment_proba.py "
-    "-i {} --shape {} -g {} "
-    .format(args.input_file, args.shape, args.gpu)
+    "-i {} --shape {} {} {} -g {} "
+    .format(args.input_file, args.shape[0], args.shape[1], args.shape[2], args.gpu)
 )
 
-noise_matrix = np.ones((n_classes, n_classes)) / n_classes
+# noise_matix[j, i] = p(noisy_label == j | true_label == i)
+p = 0.1
+noise_matrix = (1 - p) * np.eye(n_classes) + p * np.ones((n_classes, n_classes)) / n_classes
 
-os.system(cmd_train_network + "-o weight_0.npz")
+# os.system(cmd_train_network + "-o weight_0.npz")
 
 for i in range(1, args.em_step + 1):
     print("=" * 80)
     print("EM step {0:02d}".format(i))
 
     # E step
-    os.system(cmd_segment_proba + "-m weight_{}.npz".format(i - 1))
+    # os.system(cmd_segment_proba + "-m weight_{}.npz".format(i - 1))
     update_label(train_df, noise_matrix)
 
     # M step
