@@ -173,7 +173,7 @@ def main():
     dataset["data"] = dataset_list
 
     with open(args.output_file, "w") as f:
-        json.dump(dataset, f)
+        json.dump(dataset, f, indent=4, sort_keys=True)
 
     os.system("rm *tmp*")
 
