@@ -152,6 +152,7 @@ def main():
             )
             filedict["label"] = outputfile2
             onehot_encode(outputfile, outputfile2)
+            onehot_encode(outputfile, outputfile)
 
             filename = subject + args.label_suffix
             outputfile = os.path.join(output_folder, filename)
