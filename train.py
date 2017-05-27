@@ -63,19 +63,20 @@ optimizer.add_hook(ch.optimizer.WeightDecay(args.weight_decay))
 for i in range(args.iteration):
     vrn.cleargrads()
     image, proba = load.sample(train_df, args.n_batch, args.shape)
+    size = image.size
     x_train = xp.asarray(image)
     y_train = xp.asarray(proba)
-    probs = vrn(x_train, train=True)
+    logits = vrn(x_train, train=True)
     loss = 0
-    for p in probs:
-        loss += F.sum(F.log(p) * y_train)
+    for logit in logits:
+        loss += -F.sum(F.log_softmax(logit) * y_train) / size
     loss.backward()
     optimizer.update()
     if i % args.display_step == 0:
         label = np.argmax(proba, axis=1).astype(np.int32)
         label = xp.asarray(label)
-        accuracy = [float(F.accuracy(p, label).data) for p in probs]
-        print("step {0:5d}, acc_c1 {1[0]:.02f}, acc_c2 {1[1]:.02f}, acc_c3 {1[2]:.02f}, acc_c4 {1[3]:.02f}, acc {1[4]:.02f}".format(i, accuracy))
+        accuracy = [float(F.accuracy(logit, label).data) for logit in logits]
+        print("step {0:5d}, acc_c1 {1[0]:.02f}, acc_c2 {1[1]:.02f}, acc_c3 {1[2]:.02f}, acc_c4 {1[3]:.02f}, acc {1[4]:.02f}, loss {2:g}".format(i, accuracy, float(loss.data)))
 
 vrn.to_cpu()
 ch.serializers.save_npz(args.out, vrn)
