@@ -9,7 +9,18 @@ import pandas as pd
 from load import load_nifti
 
 
-def update_label(df, n_classes, suffix):
+def copy(df, index):
+    for label_path, label_warped_path in zip(df["label"], df["label_warped_path"]):
+        root, ext = os.path.splitext(label_path)
+        output = root + "_{}".format(index) + ext
+        os.system("cp {} {}".format(label_path, output))
+        if label_warped_path == label_warped_path:
+            root, ext = os.path.splitext(label_warped_path)
+            output = root + "_{}".format(index) + ext
+            os.system("cp {} {}".format(label_warped_path, output))
+
+
+def update_label(df, n_classes, suffix, precision):
 
     for label_path, label_warped_path, subject in zip(df["label"], df["label_warped"], df["subject"]):
         if label_warped_path == label_warped_path:
@@ -28,7 +39,7 @@ def update_label(df, n_classes, suffix):
                 klabel.append(tmp)
             klabel = np.asarray(klabel)
             assert klabel.shape == (n_classes,) + proba.shape
-            likelihood = np.sum(np.exp(-0.5 * (noisy_label - klabel) ** 2), axis=0)
+            likelihood = np.sum(np.exp(-0.5 * precision * (noisy_label - klabel) ** 2), axis=0) * np.power(0.5 * precision / np.pi, 0.5 * n_classes)
             assert likelihood.shape == proba.shape
             posterior = likelihood * proba
             posterior /= np.sum(posterior, axis=-1, keepdims=True)
@@ -59,14 +70,14 @@ def merge(outputfile, *inputfile):
 
 def update_displacement(df):
 
-    for label_path, label_warped_path in zip(df["label"], df["label_warped_path"]):
+    for label_path, label_warped_path in zip(df["label"], df["label_warped"]):
         if label_warped_path == label_warped_path:
             fixed = ["f{}.nii.gz".format(i) for i in range(1, 4)]
             moving = ["m{}.nii.gz".format(i) for i in range(1, 4)]
             split(label_path, *fixed)
             split(label_warped_path, *moving)
             cmd = (
-                "ANTS 3 -i 50x20x10 -t SyN[0.3] -r Gauss[3,0.5] -o tmp"
+                "ANTS 3 -i 50x20x10 -t SyN[0.3] -r Gauss[3,0.5] -o tmp "
                 "-m MSQ[{0[0]}, {1[0]}, 1, 2] -m MSQ[{0[1]}, {1[1]}, 1, 2] -m MSQ[{0[2]}, {1[2]}, 1, 2]"
                 .format(fixed, moving)
             )
@@ -78,6 +89,9 @@ def update_displacement(df):
                 )
                 os.system(cmd)
             merge(label_warped_path, *moving)
+
+    os.system("rm tmp*")
+    os.system("rm *.nii.gz")
 
 
 parser = argparse.ArgumentParser(description="train VoxResNet with EM alg.")
@@ -113,6 +127,9 @@ parser.add_argument(
     "--em_step", default=5, type=int,
     help="number of EM steps, default=5"
 )
+parser.add_argument(
+    "--precision", default=10., type=float,
+    help="precision parameter of gaussian likelihood function, default=10.")
 args = parser.parse_args()
 # print(args)
 
@@ -145,23 +162,23 @@ cmd_segment_proba = (
     .format(args.input_file, args.shape[0], args.shape[1], args.shape[2], args.gpu)
 )
 
-output_directory = os.path.dirname(args.out)
-root, ext = os.path.dirname(args.out)
+root, ext = os.path.splitext(args.out)
 
 output_file = root + "_0" + ext
-if not os.path.exists(output_file):
-    os.system(cmd_train_network + "-o {}".format(output_file))
+os.system(cmd_train_network + "-o {}".format(output_file))
 
 for i in range(1, args.em_step + 1):
     print("=" * 80)
     print("EM step {0:02d}".format(i))
 
+    copy(train_df, i - 1)
+
     # E step
-    suffix = "_segTRI_proba_{}.nii.gz".format(i)
+    suffix = "_segTRI_proba_{}.nii.gz".format(i - 1)
     os.system(
         cmd_segment_proba + "-m {0} -o {1}".format(output_file, suffix)
     )
-    update_label(train_df, n_classes, suffix)
+    update_label(train_df, n_classes, suffix, args.precision)
 
     # M step
     update_displacement(train_df)
