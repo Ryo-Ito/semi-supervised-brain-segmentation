@@ -10,12 +10,18 @@ from load import load_nifti
 
 
 def copy(df, index):
-    for label_path, label_warped_path in zip(df["label"], df["label_warped_path"]):
+    for label_path, label_warped_path in zip(df["label"], df["label_warped"]):
         root, ext = os.path.splitext(label_path)
+        if ext in [".gz", ".bz2"]:
+            root, tmp = os.path.splitext(root)
+            ext = tmp + ext
         output = root + "_{}".format(index) + ext
         os.system("cp {} {}".format(label_path, output))
         if label_warped_path == label_warped_path:
             root, ext = os.path.splitext(label_warped_path)
+            if ext in [".gz", ".bz2"]:
+                root, tmp = os.path.splitext(root)
+                ext = tmp + ext
             output = root + "_{}".format(index) + ext
             os.system("cp {} {}".format(label_warped_path, output))
 
