@@ -10,54 +10,21 @@ from load import load_nifti
 
 
 def copy(df, index):
-    for label_path, label_warped_path in zip(df["label"], df["label_warped"]):
-        root, ext = os.path.splitext(label_path)
-        if ext in [".gz", ".bz2"]:
-            root, tmp = os.path.splitext(root)
-            ext = tmp + ext
-        output = root + "_{}".format(index) + ext
-        os.system("cp {} {}".format(label_path, output))
-        if label_warped_path == label_warped_path:
-            root, ext = os.path.splitext(label_warped_path)
+    for label_path, istemplate in zip(df["label"], df["template"]):
+        if not istemplate:
+            root, ext = os.path.splitext(label_path)
             if ext in [".gz", ".bz2"]:
                 root, tmp = os.path.splitext(root)
                 ext = tmp + ext
             output = root + "_{}".format(index) + ext
-            os.system("cp {} {}".format(label_warped_path, output))
-
-
-def update_label(df, n_classes, suffix, precision):
-
-    for label_path, label_warped_path, subject in zip(df["label"], df["label_warped"], df["subject"]):
-        if label_warped_path == label_warped_path:
-            proba = load_nifti(
-                os.path.join(
-                    os.path.dirname(label_path),
-                    subject + suffix
-                )
-            )
-            noisy_label, affine = load_nifti(label_warped_path, with_affine=True)
-            assert noisy_label.shape == proba.shape
-            klabel = []
-            for k in range(n_classes):
-                tmp = np.zeros_like(proba)
-                tmp[:, :, :, k] = 1
-                klabel.append(tmp)
-            klabel = np.asarray(klabel)
-            assert klabel.shape == (n_classes,) + proba.shape
-            likelihood = np.sum(np.exp(-0.5 * precision * (noisy_label - klabel) ** 2), axis=0) * np.power(0.5 * precision / np.pi, 0.5 * n_classes)
-            assert likelihood.shape == proba.shape
-            posterior = likelihood * proba
-            posterior /= np.sum(posterior, axis=-1, keepdims=True)
-
-            nib.save(nib.Nifti1Image(posterior.astype(np.float32), affine), label_path)
+            os.system("cp {} {}".format(label_path, output))
 
 
 def split(inputfile, *outputfile):
     img = nib.load(inputfile)
     data = img.get_data()
     data = data.transpose(3, 0, 1, 2)
-    for d, out in zip(data[1:], outputfile):
+    for d, out in zip(data, outputfile):
         nib.save(nib.Nifti1Image(d, img.affine), out)
 
 
@@ -74,30 +41,42 @@ def merge(outputfile, *inputfile):
     nib.save(nib.Nifti1Image(data, img.affine), outputfile)
 
 
-def update_displacement(df):
+def update_displacement(df, suffix, n_classes):
 
-    for label_path, label_warped_path in zip(df["label"], df["label_warped"]):
-        if label_warped_path == label_warped_path:
-            fixed = ["f{}.nii.gz".format(i) for i in range(1, 4)]
-            moving = ["m{}.nii.gz".format(i) for i in range(1, 4)]
-            split(label_path, *fixed)
-            split(label_warped_path, *moving)
+    for image_path, label_path, onehot_path, istemplate in zip(df["image"], df["label"], df["onehot"], df["template"]):
+        if istemplate:
+            moving = onehot_path
+            moving.append(image_path)
+            moving.append(label_path)
+
+    for subject, image_path, label_path, istemplate in zip(df["subject"], df["image"], df["label"], df["template"]):
+        if not istemplate:
+            print(subject, image_path, label_path, istemplate)
+            fixed = ["f{}.nii.gz".format(i) for i in range(n_classes)]
+            fixed.append(image_path)
+            split(
+                os.path.join(
+                    os.path.dirname(label_path),
+                    subject + suffix),
+                *fixed)
             cmd = (
                 "ANTS 3 -i 50x20x10 -t SyN[0.3] -r Gauss[3,0.5] -o tmp "
-                "-m MSQ[{0[0]}, {1[0]}, 1, 2] -m MSQ[{0[1]}, {1[1]}, 1, 2] -m MSQ[{0[2]}, {1[2]}, 1, 2]"
+                "-m MSQ[{0[1]}, {1[1]}, 1, 2] -m MSQ[{0[2]}, {1[2]}, 1, 2] -m MSQ[{0[3]}, {1[3]}, 1, 2] -m PR[{0[4]}, {1[4]}, 1, 2]"
                 .format(fixed, moving)
             )
             os.system(cmd)
-            for m in moving:
-                cmd = (
-                    "antsApplyTransforms -d 3 -i {} -r {} -o {} -t tmpAffine.txt tmpWarp.nii.gz -n NearestNeighbor"
-                    .format(m, label_warped_path, m)
-                )
-                os.system(cmd)
-            merge(label_warped_path, *moving)
+            print("moving_label = {}".format(moving[-1]))
+            cmd = (
+                "antsApplyTransforms -d 3 -i {} -r {} -o {} -t tmpWarp.nii.gz tmpAffine.txt -n NearestNeighbor"
+                .format(moving[-1], label_path, label_path)
+            )
+            os.system(cmd)
+            img = nib.load(label_path)
+            data = img.get_data().astype(np.int32)
+            nib.save(nib.Nifti1Image(data, img.affine), label_path)
 
-    os.system("rm tmp*")
-    os.system("rm *.nii.gz")
+    # os.system("rm tmp*")
+    # os.system("rm *.nii.gz")
 
 
 parser = argparse.ArgumentParser(description="train VoxResNet with EM alg.")
@@ -171,22 +150,21 @@ cmd_segment_proba = (
 root, ext = os.path.splitext(args.out)
 
 output_file = root + "_0" + ext
-os.system(cmd_train_network + "-o {}".format(output_file))
+# os.system(cmd_train_network + "-o {}".format(output_file))
 
 for i in range(1, args.em_step + 1):
     print("=" * 80)
     print("EM step {0:02d}".format(i))
 
-    copy(train_df, i - 1)
+    # copy(train_df, i - 1)
 
     # E step
     suffix = "_segTRI_proba_{}.nii.gz".format(i - 1)
-    os.system(
-        cmd_segment_proba + "-m {0} -o {1}".format(output_file, suffix)
-    )
-    update_label(train_df, n_classes, suffix, args.precision)
+    # os.system(
+    #     cmd_segment_proba + "-m {0} -o {1}".format(output_file, suffix)
+    # )
 
     # M step
-    update_displacement(train_df)
+    update_displacement(train_df, suffix, n_classes)
     output_file = root + "_{}".format(i) + ext
-    os.system(cmd_train_network + "-o {}".format(output_file))
+    # os.system(cmd_train_network + "-o {}".format(output_file))
