@@ -35,16 +35,12 @@ def preprocess(inputfile, outputfile, order=0):
     nib.save(img, outputfile)
 
 
-def onehot_encode(inputfile, outputfile):
+def split(inputfile, *outputfile):
     img = nib.load(inputfile)
     data = img.get_data()
     labels = np.unique(data)
-    onehot = []
-    for label in labels:
-        onehot.append((data == label).astype(np.float32))
-    onehot = np.stack(onehot)
-    onehot = onehot.transpose(1, 2, 3, 0)
-    nib.save(nib.Nifti1Image(onehot, img.affine), outputfile)
+    for label, out in zip(labels, outputfile):
+        nib.save(nib.Nifti1Image((data == label).astype(np.float32), img.affine), out)
 
 
 def main():
@@ -103,7 +99,12 @@ def main():
             os.path.join(args.input_directory, args.template, filename),
             outputfile,
             order=0)
-        onehot_encode(outputfile, outputfile)
+        outputfile2 = [os.path.join(
+            output_folder,
+            args.template + "_segTRI_onehot_{}.nii.gz".format(i)) for i in range(args.n_classes)]
+        split(outputfile, *outputfile2)
+        filedict["onehot"] = outputfile2
+        filedict["template"] = 1
 
         dataset_list.append(filedict)
 
@@ -141,18 +142,11 @@ def main():
 
             filename = subject + "_segTRI_warped.nii.gz"
             outputfile = os.path.join(output_folder, filename)
-            filedict["label_warped"] = outputfile
+            filedict["label"] = outputfile
             preprocess(
                 "label_tmp.nii.gz",
                 outputfile,
                 order=0)
-            outputfile2 = os.path.join(
-                output_folder,
-                subject + "_segTRI_estimate.nii.gz"
-            )
-            filedict["label"] = outputfile2
-            onehot_encode(outputfile, outputfile2)
-            onehot_encode(outputfile, outputfile)
 
             filename = subject + args.label_suffix
             outputfile = os.path.join(output_folder, filename)
@@ -160,6 +154,7 @@ def main():
                 os.path.join(args.input_directory, subject, filename),
                 outputfile,
                 order=0)
+            filedict["template"] = 0
         else:
             filename = subject + args.label_suffix
             outputfile = os.path.join(output_folder, filename)
