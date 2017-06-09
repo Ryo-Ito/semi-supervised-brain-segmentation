@@ -154,21 +154,21 @@ cmd_segment_proba = (
 root, ext = os.path.splitext(args.out)
 
 output_file = root + "_0" + ext
-# os.system(cmd_train_network + "-o {}".format(output_file))
+os.system(cmd_train_network + "-o {}".format(output_file))
 
 for i in range(1, args.em_step + 1):
     print("=" * 80)
     print("EM step {0:02d}".format(i))
 
-    # copy(train_df, i - 1)
+    copy(train_df, i - 1)
 
     # E step
     suffix = "_segTRI_proba_{}.nii.gz".format(i - 1)
-    # os.system(
-    #     cmd_segment_proba + "-m {0} -o {1}".format(output_file, suffix)
-    # )
+    os.system(
+        cmd_segment_proba + "-m {0} -o {1}".format(output_file, suffix)
+    )
 
     # M step
-    # update_displacement(train_df, suffix, n_classes)
+    update_displacement(train_df, suffix, n_classes)
     output_file = root + "_{}".format(i) + ext
     os.system(cmd_train_network + "-o {}".format(output_file))
