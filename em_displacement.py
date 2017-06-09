@@ -45,15 +45,19 @@ def update_displacement(df, suffix, n_classes):
 
     for image_path, label_path, onehot_path, istemplate in zip(df["image"], df["label"], df["onehot"], df["template"]):
         if istemplate:
+            moving_image_path = ["m{}.nii.gz".format(i) for i in range(2)]
+            split(image_path, *moving_image_path)
             moving = onehot_path
-            moving.append(image_path)
+            moving.append(moving_image_path[1])
             moving.append(label_path)
 
     for subject, image_path, label_path, istemplate in zip(df["subject"], df["image"], df["label"], df["template"]):
         if not istemplate:
             print(subject, image_path, label_path, istemplate)
             fixed = ["f{}.nii.gz".format(i) for i in range(n_classes)]
-            fixed.append(image_path)
+            fixed_image_path = ["f{}_image.nii.gz".format(i) for i in range(2)]
+            split(image_path, *fixed_image_path)
+            fixed.append(fixed_image_path[1])
             split(
                 os.path.join(
                     os.path.dirname(label_path),
@@ -165,6 +169,6 @@ for i in range(1, args.em_step + 1):
     # )
 
     # M step
-    update_displacement(train_df, suffix, n_classes)
+    # update_displacement(train_df, suffix, n_classes)
     output_file = root + "_{}".format(i) + ext
-    # os.system(cmd_train_network + "-o {}".format(output_file))
+    os.system(cmd_train_network + "-o {}".format(output_file))
