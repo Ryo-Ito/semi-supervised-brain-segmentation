@@ -5,11 +5,12 @@ import os
 from dipy.align.reslice import reslice
 import nibabel as nib
 import numpy as np
+import pandas as pd
 from scipy.ndimage.filters import gaussian_filter
 import SimpleITK as sitk
 
 
-def preprocess(inputfile, outputfile, order=0):
+def preprocess(inputfile, outputfile, order=0, df=None, input_key=None, output_key=None):
     img = nib.load(inputfile)
     data = img.get_data()
     affine = img.affine
@@ -18,6 +19,11 @@ def preprocess(inputfile, outputfile, order=0):
     data = np.squeeze(data)
     data = np.pad(data, [(0, 256 - len_) for len_ in data.shape], "constant")
     if order == 0:
+        if df is not None:
+            tmp = np.zeros_like(data)
+            for target, source in zip(df[output_key], df[input_key]):
+                tmp[np.where(data == source)] = target
+            data = tmp
         data = np.int32(data)
         assert data.ndim == 3, data.ndim
     else:
@@ -35,148 +41,110 @@ def preprocess(inputfile, outputfile, order=0):
     nib.save(img, outputfile)
 
 
-def onehot_encode(inputfile, outputfile):
-    img = nib.load(inputfile)
-    data = img.get_data()
-    labels = np.unique(data)
-    onehot = []
-    for label in labels:
-        onehot.append((data == label).astype(np.float32))
-    onehot = np.stack(onehot)
-    onehot = onehot.transpose(1, 2, 3, 0)
-    nib.save(nib.Nifti1Image(onehot, img.affine), outputfile)
-
-
 def main():
     parser = argparse.ArgumentParser(description="preprocess dataset")
     parser.add_argument(
         "--input_directory", "-i", type=str,
-        help="directory of original dataset")
-    parser.add_argument(
-        "--template", "-t", type=str,
-        help="template subject whose label will be used")
+        help="directory of original dataset"
+    )
     parser.add_argument(
         "--subjects", "-s", type=str, nargs="*", action="store",
-        help="other subject whose label will not be used")
+        help="subjects to be preprocessed"
+    )
     parser.add_argument(
-        "--image_suffix", type=str, default="_ana_strip.nii.gz",
-        help="suffix of images, default=_ana_strip.nii.gz")
+        "--weights", "-w", type=int, nargs="*", action="store",
+        help="sample weight for each subject"
+    )
     parser.add_argument(
-        "--label_suffix", type=str, default="_segTRI_ana.nii.gz",
-        help="suffix of labels, default=_segTRI_ana.nii.gz")
+        "--image_suffix", type=str,
+        help="suffix of images"
+    )
+    parser.add_argument(
+        "--label_suffix", type=str,
+        help="suffix of labels"
+    )
+    parser.add_argument(
+        "--onehot_suffix", type=str,
+        help="suffix of onehot labels"
+    )
     parser.add_argument(
         "--output_directory", "-o", type=str,
-        help="directory of preprocessed dataset")
+        help="directory of preprocessed dataset"
+    )
     parser.add_argument(
         "--output_file", "-f", type=str, default="dataset.json",
-        help="json file of preprocessed dataset, default=dataset.json")
+        help="json file of preprocessed dataset, default=dataset.json"
+    )
     parser.add_argument(
-        "--n_classes", type=int, default=4,
-        help="number of classes to classify")
+        "--label_file", "-l", type=str, default=None,
+        help="csv file with label translation rule, default=None"
+    )
+    parser.add_argument(
+        "--input_key", type=str, default=None,
+        help="specifies column for input of label translation, default=None"
+    )
+    parser.add_argument(
+        "--output_key", type=str, default=None,
+        help="specifies column for output of label translation, default=None"
+    )
+    parser.add_argument(
+        "--n_classes", type=int,
+        help="number of classes to classify"
+    )
     args = parser.parse_args()
+    if args.weights is None:
+        args.weights = [1. for _ in args.subjects]
+    assert len(args.subjects) == len(args.weights)
     print(args)
+
+    if args.label_file is None:
+        df = None
+    else:
+        df = pd.read_csv(args.label_file)
 
     dataset = {"in_channels": 2, "n_classes": args.n_classes}
     dataset_list = []
 
     if not os.path.exists(args.output_directory):
         os.makedirs(args.output_directory)
-
-    if args.template is not None:
-        output_folder = os.path.join(args.output_directory, args.template)
-        if not os.path.exists(output_folder):
-            os.makedirs(output_folder)
-        filedict = {"subject": args.template}
-
-        filename = args.template + args.image_suffix
-        outputfile = os.path.join(output_folder, filename)
-        filedict["image"] = outputfile
-        preprocess(
-            os.path.join(args.input_directory, args.template, filename),
-            outputfile,
-            order=1)
-
-        filename = args.template + args.label_suffix
-        outputfile = os.path.join(output_folder, filename)
-        filedict["label"] = outputfile
-        preprocess(
-            os.path.join(args.input_directory, args.template, filename),
-            outputfile,
-            order=0)
-        onehot_encode(outputfile, outputfile)
-
-        dataset_list.append(filedict)
-
-    for subject in args.subjects:
+    for subject, weight in zip(args.subjects, args.weights):
         output_folder = os.path.join(args.output_directory, subject)
         if not os.path.exists(output_folder):
             os.makedirs(output_folder)
-        filedict = {"subject": subject}
+        filedict = {"subject": subject, "weight": weight}
 
-        filename = subject + args.image_suffix
-        outputfile = os.path.join(output_folder, filename)
-        filedict["image"] = outputfile
-        preprocess(
-            os.path.join(args.input_directory, subject, filename),
-            outputfile,
-            order=1)
-
-        if args.template is not None:
-            cmd = (
-                "ANTS 3 -m PR[{0}, {1}, 1, 2] -i 50x20x10 -t SyN[0.3] -r Gauss[3,0.5] -o tmp"
-                .format(
-                    os.path.join(args.input_directory, subject, subject + args.image_suffix),
-                    os.path.join(args.input_directory, args.template, args.template + args.image_suffix)
-                )
-            )
-            os.system(cmd)
-            cmd = (
-                "antsApplyTransforms -d 3 -i {} -r {} -o label_tmp.nii.gz -t tmpAffine.txt tmpWarp.nii.gz -n NearestNeighbor"
-                .format(
-                    os.path.join(args.input_directory, args.template, args.template + args.label_suffix),
-                    os.path.join(args.input_directory, subject, subject + args.image_suffix),
-                )
-            )
-            os.system(cmd)
-
-            filename = subject + "_segTRI_warped.nii.gz"
+        if args.image_suffix is not None:
+            filename = subject + args.image_suffix
             outputfile = os.path.join(output_folder, filename)
-            filedict["label_warped"] = outputfile
-            preprocess(
-                "label_tmp.nii.gz",
-                outputfile,
-                order=0)
-            outputfile2 = os.path.join(
-                output_folder,
-                subject + "_segTRI_estimate.nii.gz"
-            )
-            filedict["label"] = outputfile2
-            onehot_encode(outputfile, outputfile2)
-            onehot_encode(outputfile, outputfile)
-
-            filename = subject + args.label_suffix
-            outputfile = os.path.join(output_folder, filename)
+            filedict["image"] = outputfile
             preprocess(
                 os.path.join(args.input_directory, subject, filename),
                 outputfile,
-                order=0)
-        else:
+                order=1)
+
+        if args.label_suffix is not None:
             filename = subject + args.label_suffix
             outputfile = os.path.join(output_folder, filename)
             filedict["label"] = outputfile
             preprocess(
                 os.path.join(args.input_directory, subject, filename),
                 outputfile,
-                order=0)
+                order=0,
+                df=df,
+                input_key=args.input_key,
+                output_key=args.output_key)
+            filedict["onehot"] = output_folder + "/" + subject + args.onehot_suffix
+            os.system(f"cp {outputfile} {filedict['onehot']}")
+            os.system(
+                f"python convert.py -i {filedict['onehot']}"
+                f" -t onehot -n {args.n_classes}"
+            )
 
         dataset_list.append(filedict)
-
     dataset["data"] = dataset_list
 
     with open(args.output_file, "w") as f:
         json.dump(dataset, f, indent=4, sort_keys=True)
-
-    os.system("rm *tmp*")
 
 
 if __name__ == '__main__':
