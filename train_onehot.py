@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 from model import VoxResNet
-from utils import load_sample, load_nifti, crop_patch, dice_coefficients, feedforward
+from utils import load_sample_onehot, load_nifti, crop_patch, dice_coefficients, feedforward
 
 
 def validate(model, df, input_shape, output_shape, n_tiles, n_classes):
@@ -99,7 +99,7 @@ def main():
     ]
     for i in range(args.iteration):
         vrn.cleargrads()
-        image, label = load_sample(
+        image, label = load_sample_onehot(
             train_df,
             args.n_batch,
             args.input_shape,
@@ -109,13 +109,13 @@ def main():
         y_train = vrn.xp.asarray(label)
         logits = vrn(x_train, train=True)
         logits = [logit[slices_in] for logit in logits]
-        loss = F.softmax_cross_entropy(logits[-1], y_train)
+        loss = F.log_softmax(logits[-1]) * y_train
         for logit in logits[:-1]:
-            loss += F.softmax_cross_entropy(logit, y_train)
+            loss += F.log_softmax(logit) * y_train
         loss.backward()
         optimizer.update()
         if i % args.monitor_step == 0:
-            accuracy = float(F.accuracy(logits[-1], y_train).data)
+            accuracy = float(F.accuracy(logits[-1], y_train.argmax(axis=1)).data)
             print(
                 f"step {i:5d}, accuracy {accuracy:.02f}, loss {float(loss.data):g}"
             )
