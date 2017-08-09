@@ -165,7 +165,7 @@ def main():
                 )
                 cmd += (
                     "; cd ../semi-supervised-brain-segmentation"
-                    "; python convert.py -i {} -d int32"
+                    "; python convert.py -i {} -t int32"
                     .format(output)
                 )
                 throw_with_qsub(cmd, args.directory)
