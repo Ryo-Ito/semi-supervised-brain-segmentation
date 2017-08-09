@@ -163,7 +163,11 @@ def main():
                         subject["subject"]
                     )
                 )
-                cmd += ";python convert.py -i {} -d int32".format(output)
+                cmd += (
+                    "; cd ../semi-supervised-brain-segmentation"
+                    "; python convert.py -i {} -d int32"
+                    .format(output)
+                )
                 throw_with_qsub(cmd, args.directory)
 
     dataset["data"] = template_list + subject_list
