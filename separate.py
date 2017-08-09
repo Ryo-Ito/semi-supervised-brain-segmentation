@@ -44,6 +44,10 @@ def main():
         help="dataset for full training"
     )
     parser.add_argument(
+        "--output_template", type=str,
+        help="dataset for template"
+    )
+    parser.add_argument(
         "--output_semi", type=str,
         help="dataset for semi training"
     )
@@ -69,7 +73,7 @@ def main():
         dict_["image"] = image_path
         data_full.append(dict_)
     dataset["data"] = data_full
-    with open("dataset_train_full.json", "w") as f:
+    with open(args.output_full, "w") as f:
         json.dump(dataset, f, indent=4, sort_keys=True)
 
     template_list = []
@@ -103,7 +107,7 @@ def main():
 
     n_templates = len(template_list)
     dataset["data"] = template_list
-    with open("dataset_template.json", "w") as f:
+    with open(args.output_template, "w") as f:
         json.dump(dataset, f, indent=4, sort_keys=True)
 
     subject_list = []
@@ -164,7 +168,7 @@ def main():
 
     dataset["data"] = template_list + subject_list
 
-    with open("dataset_train_semi.json", "w") as f:
+    with open(args.output_semi, "w") as f:
         json.dump(dataset, f, indent=4, sort_keys=True)
 
 if __name__ == '__main__':
