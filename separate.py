@@ -36,6 +36,10 @@ def main():
         help="subject name to be used as templates"
     )
     parser.add_argument(
+        "--directory", type=str,
+        help="directory to throw job at"
+    )
+    parser.add_argument(
         "--output_full", type=str,
         help="dataset for full training"
     )
@@ -44,7 +48,6 @@ def main():
         help="dataset for semi training"
     )
     args = parser.parse_args()
-    args.directory = os.path.dirname(args.dataset)
     print(args)
 
     with open(args.dataset) as f:
