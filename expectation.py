@@ -22,8 +22,19 @@ parser.add_argument(
     "--precision", type=float,
     help="precision of gaussian likelihood function"
 )
+parser.add_argument(
+    "--prior_suffix", type=str,
+    help="suffix of prior path"
+)
+parser.add_argument(
+    "--observed_suffix", type=str,
+    help="suffix of observed path"
+)
+parser.add_argument(
+    "--output_suffix", type=str,
+    help="suffix of output path"
+)
 args = parser.parse_args()
-args.n = n
 print(args)
 
 with open(args.dataset) as f:
@@ -37,13 +48,16 @@ normal = multivariate_normal(mean=mean, cov=1 / args.precision)
 likelihood_same = normal.pdf(mean)
 likelihood_diff = normal.pdf(mean[::-1])
 
-for subject, source, istemplate in zip(df["subject"], df["source"], df["template"]):
+for subject, source, target, istemplate in zip(df["subject"],
+                                               df["source"],
+                                               df["onehot"],
+                                               df["template"]):
     if istemplate:
         continue
 
     # loading prior data and observation data
-    prior_path = "{0}/{0}_segTRI_prior_{1}.nii.gz".format(subject, n - 1)
-    observed_path = "{0}/{1}_to_{0}_segTRI_ana_{2}.nii.gz".format(subject, source, n - 1)
+    prior_path = "{0}/{0}{1}".format(subject, args.prior_suffix)
+    observed_path = "{0}/{1}_to_{0}{2}".format(subject, source, args.observed_suffix)
     prior_img = nib.load(prior_path)
     observed_img = nib.load(observed_path)
     prior_data = prior_img.get_data()
@@ -64,7 +78,9 @@ for subject, source, istemplate in zip(df["subject"], df["source"], df["template
     posterior = posterior.astype(np.float32)
     nib.save(
         nib.Nifti1Image(posterior, prior_img.affine),
-        f"{subject}/{source}_to_{subject}_segTRI_proba_{n}.nii.gz")
+        f"{subject}/{source}_to_{subject}{args.output_suffix}"
+    )
     nib.save(
         nib.Nifti1Image(posterior, prior_img.affine),
-        f"{subject}/{source}_to_{subject}_segTRI_proba.nii.gz")
+        f"{target}"
+    )
