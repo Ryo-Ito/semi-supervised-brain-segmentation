@@ -20,8 +20,11 @@ def split(inputfile, *outputfile):
         nib.save(nib.Nifti1Image(d.astype(np.float32), img.affine), out)
 
 
-def throw_with_qsub(cmd, directory):
-    cmd = 'echo "source ~/.bashrc; cd {0}; {1}" | qsub -l nodes=1:ppn=6'.format(directory, cmd)
+def throw_with_qsub(cmd):
+    cmd = (
+        'echo "source ~/.bashrc; cd {0}; {1}" | qsub -l nodes=1:ppn=6'
+        .format(os.getcwd(), cmd)
+    )
     os.system(cmd)
 
 
@@ -34,10 +37,6 @@ def main():
     parser.add_argument(
         "--templates", "-t", type=str, nargs="*", action="store",
         help="subject name to be used as templates"
-    )
-    parser.add_argument(
-        "--directory", type=str,
-        help="directory to throw job at"
     )
     parser.add_argument(
         "--output_full", type=str,
@@ -164,11 +163,10 @@ def main():
                     )
                 )
                 cmd += (
-                    "; cd ../semi-supervised-brain-segmentation"
-                    "; python convert.py -i {} -t int32"
-                    .format(output)
+                    "; python {0}/convert.py -i {1} -t int32"
+                    .format(os.path.abspath(os.path.dirname(__file__)), output)
                 )
-                throw_with_qsub(cmd, args.directory)
+                throw_with_qsub(cmd)
 
     dataset["data"] = template_list + subject_list
 
