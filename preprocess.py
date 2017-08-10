@@ -91,10 +91,6 @@ def main():
         help="suffix of onehot labels"
     )
     parser.add_argument(
-        "--output_directory", "-o", type=str,
-        help="directory of preprocessed dataset"
-    )
-    parser.add_argument(
         "--output_file", "-f", type=str, default="dataset.json",
         help="json file of preprocessed dataset, default=dataset.json"
     )
@@ -128,17 +124,14 @@ def main():
     dataset = {"in_channels": 2, "n_classes": args.n_classes}
     dataset_list = []
 
-    if not os.path.exists(args.output_directory):
-        os.makedirs(args.output_directory)
     for subject, weight in zip(args.subjects, args.weights):
-        output_folder = os.path.join(args.output_directory, subject)
-        if not os.path.exists(output_folder):
-            os.makedirs(output_folder)
+        if not os.path.exists(subject):
+            os.makedirs(subject)
         filedict = {"subject": subject, "weight": weight}
 
         if args.image_suffix is not None:
             filename = subject + args.image_suffix
-            outputfile = os.path.join(output_folder, filename)
+            outputfile = os.path.join(subject, filename)
             filedict["image"] = outputfile
             preprocess_img(
                 os.path.join(args.input_directory, subject, filename),
@@ -147,9 +140,9 @@ def main():
 
         if args.label_suffix is not None:
             filename = subject + args.label_suffix
-            outputfile = os.path.join(output_folder, filename)
+            outputfile = os.path.join(subject, filename)
             outputfile_onehot = (
-                output_folder + "/" + subject + args.onehot_suffix
+                subject + "/" + subject + args.onehot_suffix
             )
             filedict["label"] = outputfile
             filedict["onehot"] = outputfile_onehot
@@ -160,7 +153,8 @@ def main():
                 args.n_classes,
                 df=df,
                 input_key=args.input_key,
-                output_key=args.output_key)
+                output_key=args.output_key
+            )
 
         dataset_list.append(filedict)
     dataset["data"] = dataset_list
