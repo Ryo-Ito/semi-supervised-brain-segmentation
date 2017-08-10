@@ -109,9 +109,9 @@ def main():
         y_train = vrn.xp.asarray(label)
         logits = vrn(x_train, train=True)
         logits = [logit[slices_in] for logit in logits]
-        loss = F.log_softmax(logits[-1]) * y_train
+        loss = -F.log_softmax(logits[-1]) * y_train
         for logit in logits[:-1]:
-            loss += F.log_softmax(logit) * y_train
+            loss += -F.log_softmax(logit) * y_train
         loss.backward()
         optimizer.update()
         if i % args.monitor_step == 0:
