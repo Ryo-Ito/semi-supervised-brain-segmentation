@@ -1,3 +1,5 @@
+import itertools
+import chainer
 import numpy as np
 import nibabel as nib
 
