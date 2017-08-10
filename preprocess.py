@@ -10,35 +10,58 @@ from scipy.ndimage.filters import gaussian_filter
 import SimpleITK as sitk
 
 
-def preprocess(inputfile, outputfile, order=0, df=None, input_key=None, output_key=None):
+def preprocess_img(inputfile, outputfile):
     img = nib.load(inputfile)
     data = img.get_data()
     affine = img.affine
     zoom = img.header.get_zooms()[:3]
-    data, affine = reslice(data, affine, zoom, (1., 1., 1.), order)
+    data, affine = reslice(data, affine, zoom, (1., 1., 1.), 1)
     data = np.squeeze(data)
     data = np.pad(data, [(0, 256 - len_) for len_ in data.shape], "constant")
-    if order == 0:
-        if df is not None:
-            tmp = np.zeros_like(data)
-            for target, source in zip(df[output_key], df[input_key]):
-                tmp[np.where(data == source)] = target
-            data = tmp
-        data = np.int32(data)
-        assert data.ndim == 3, data.ndim
-    else:
-        data_sub = data - gaussian_filter(data, sigma=1)
-        img = sitk.GetImageFromArray(np.copy(data_sub))
-        img = sitk.AdaptiveHistogramEqualization(img)
-        data_clahe = sitk.GetArrayFromImage(img)[:, :, :, None]
-        data = np.concatenate((data_clahe, data[:, :, :, None]), 3)
-        data = (data - np.mean(data, (0, 1, 2))) / np.std(data, (0, 1, 2))
-        assert data.ndim == 4, data.ndim
-        assert np.allclose(np.mean(data, (0, 1, 2)), 0.), np.mean(data, (0, 1, 2))
-        assert np.allclose(np.std(data, (0, 1, 2)), 1.), np.std(data, (0, 1, 2))
-        data = np.float32(data)
+
+    data_sub = data - gaussian_filter(data, sigma=1)
+    img = sitk.GetImageFromArray(np.copy(data_sub))
+    img = sitk.AdaptiveHistogramEqualization(img)
+    data_clahe = sitk.GetArrayFromImage(img)[:, :, :, None]
+    data = np.concatenate((data_clahe, data[:, :, :, None]), 3)
+    data = (data - np.mean(data, (0, 1, 2))) / np.std(data, (0, 1, 2))
+    assert data.ndim == 4, data.ndim
+    assert np.allclose(np.mean(data, (0, 1, 2)), 0.), np.mean(data, (0, 1, 2))
+    assert np.allclose(np.std(data, (0, 1, 2)), 1.), np.std(data, (0, 1, 2))
+    data = np.float32(data)
+
     img = nib.Nifti1Image(data, affine)
     nib.save(img, outputfile)
+
+
+def preprocess_label(inputfile,
+                     outputfile,
+                     output_onehot,
+                     n_classes,
+                     df=None,
+                     input_key=None,
+                     output_key=None):
+    img = nib.load(inputfile)
+    data = img.get_data()
+    affine = img.affine
+    zoom = img.header.get_zooms()[:3]
+    data, affine = reslice(data, affine, zoom, (1., 1., 1.), 0)
+    data = np.squeeze(data)
+    data = np.pad(data, [(0, 256 - len_) for len_ in data.shape], "constant")
+
+    if df is not None:
+        tmp = np.zeros_like(data)
+        for target, source in zip(df[output_key], df[input_key]):
+            tmp[np.where(data == source)] = target
+        data = tmp
+    data = np.int32(data)
+    img = nib.Nifti1Image(data, affine)
+    nib.save(img, outputfile)
+
+    data = np.eye(n_classes)[data]
+    data = data.astype(np.float32)
+    img = nib.Nifti1Image(data, affine)
+    nib.save(img, output_onehot)
 
 
 def main():
@@ -117,28 +140,27 @@ def main():
             filename = subject + args.image_suffix
             outputfile = os.path.join(output_folder, filename)
             filedict["image"] = outputfile
-            preprocess(
+            preprocess_img(
                 os.path.join(args.input_directory, subject, filename),
-                outputfile,
-                order=1)
+                outputfile
+            )
 
         if args.label_suffix is not None:
             filename = subject + args.label_suffix
             outputfile = os.path.join(output_folder, filename)
+            outputfile_onehot = (
+                output_folder + "/" + subject + args.onehot_suffix
+            )
             filedict["label"] = outputfile
-            preprocess(
+            filedict["onehot"] = outputfile_onehot
+            preprocess_label(
                 os.path.join(args.input_directory, subject, filename),
                 outputfile,
-                order=0,
+                outputfile_onehot,
+                args.n_classes,
                 df=df,
                 input_key=args.input_key,
                 output_key=args.output_key)
-            filedict["onehot"] = output_folder + "/" + subject + args.onehot_suffix
-            os.system(f"cp {outputfile} {filedict['onehot']}")
-            os.system(
-                f"python convert.py -i {filedict['onehot']}"
-                f" -t onehot -n {args.n_classes}"
-            )
 
         dataset_list.append(filedict)
     dataset["data"] = dataset_list
