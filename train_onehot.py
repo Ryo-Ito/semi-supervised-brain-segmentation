@@ -99,23 +99,26 @@ def main():
     ]
     for i in range(args.iteration):
         vrn.cleargrads()
-        image, label = load_sample_onehot(
+        image, onehot = load_sample_onehot(
             train_df,
             args.n_batch,
             args.input_shape,
             args.output_shape
         )
+        label = np.argmax(onehot, axis=1).astype(np.int32)
+        size = label.size
         x_train = vrn.xp.asarray(image)
-        y_train = vrn.xp.asarray(label)
+        y_train = vrn.xp.asarray(onehot)
+        label = vrn.xp.asarray(label)
         logits = vrn(x_train, train=True)
         logits = [logit[slices_in] for logit in logits]
-        loss = -F.log_softmax(logits[-1]) * y_train
+        loss = -F.sum(F.log_softmax(logits[-1]) * y_train) / size
         for logit in logits[:-1]:
-            loss += -F.log_softmax(logit) * y_train
+            loss += -F.sum(F.log_softmax(logit) * y_train) / size
         loss.backward()
         optimizer.update()
         if i % args.monitor_step == 0:
-            accuracy = float(F.accuracy(logits[-1], y_train.argmax(axis=1)).data)
+            accuracy = float(F.accuracy(logits[-1], label).data)
             print(
                 f"step {i:5d}, accuracy {accuracy:.02f}, loss {float(loss.data):g}"
             )

@@ -111,7 +111,7 @@ def load_sample_onehot(df, n, input_shape, output_shape):
     else:
         indices = np.random.choice(N, n, replace=True)
     image_files = df["image"][indices]
-    label_files = df["label"][indices]
+    label_files = df["onehot"][indices]
     images = []
     labels = []
     for image_file, label_file in zip(image_files, label_files):
