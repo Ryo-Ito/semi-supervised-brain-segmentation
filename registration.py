@@ -29,7 +29,7 @@ def perform_registration(df, input_suffix, output_suffix, n_classes):
         fixed_onehot = ["{}_to_{}_onehot{}.nii.gz".format(source, fixed_subject, i) for i in range(n_classes)]
         split(
             os.path.join(
-                os.path.dirname(fixed_label),
+                os.path.dirname(fixed_image),
                 source + "_to_" + fixed_subject + input_suffix
             ),
             *fixed_onehot
@@ -53,14 +53,13 @@ def perform_registration(df, input_suffix, output_suffix, n_classes):
             .format(moving_label, fixed_image, output, moving_subject, fixed_subject)
         )
         cmd += (
-            "; python {}/convert.py -i {} -d int32"
+            "; python {}/convert.py -i {} -t int32"
             .format(os.path.abspath(os.path.dirname(__file__)), output)
         )
         print(fixed_subject, moving_subject)
         throw_with_qsub(cmd)
         # if (fixed_subject, moving_subject) == ("IBSR_06", "IBSR_18"):
         #     os.system(cmd)
-
 
 
 def main():
