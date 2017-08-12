@@ -23,7 +23,7 @@ def split(inputfile, *outputfile):
 
 def perform_registration(df, input_suffix, output_suffix, n_classes):
 
-    for fixed_subject, fixed_label, source, istemplate in zip(df["subject"], df["label"], df["source"], df["template"]):
+    for fixed_subject, fixed_image, source, istemplate in zip(df["subject"], df["raw_image"], df["source"], df["template"]):
         if istemplate:
             continue
         fixed_onehot = ["{}_to_{}_onehot{}.nii.gz".format(source, fixed_subject, i) for i in range(n_classes)]
@@ -38,7 +38,7 @@ def perform_registration(df, input_suffix, output_suffix, n_classes):
     for fixed_subject, fixed_image, fixed_label, moving_subject, istemplate in zip(df["subject"], df["raw_image"], df["label"], df["source"], df["template"]):
         if istemplate:
             continue
-        for subject, moving_image, moving_label, moving_onehot in zip(df["subject"], df["raw_image"], df["label"], df["onehot"]):
+        for subject, moving_image, moving_label, moving_onehot in zip(df["subject"], df["raw_image"], df["label"], df["onehots"]):
             if moving_subject == subject:
                 break
         fixed_onehot = ["{}_to_{}_onehot{}.nii.gz".format(moving_subject, fixed_subject, i) for i in range(n_classes)]
