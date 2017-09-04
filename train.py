@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 from model import VoxResNet
-from utils import load_sample, load_nifti, crop_patch, dice_coefficients, feedforward
+from utils import load_sample, load_nifti, dice_coefficients, feedforward
 
 
 def validate(model, df, input_shape, output_shape, n_tiles, n_classes):
@@ -137,7 +137,6 @@ def main():
                 print(
                     f"step {i:5d}",
                     f"val/dice {mean_dice_coefs:.02f}",
-                    *[f"val/dice{j} {dice:.02f}" for j, dice in enumerate(dice_coefs)],
                     sep=", "
                 )
 
@@ -157,7 +156,6 @@ def main():
         print(
             f"step {args.iteration:5d}",
             f"val/dice {mean_dice_coefs:.02f}",
-            *[f"val/dice{j} {dice:.02f}" for j, dice in enumerate(dice_coefs)],
             sep=", "
         )
     else:
