@@ -39,16 +39,20 @@ def main():
         help="subject name to be used as templates"
     )
     parser.add_argument(
-        "--output_full", type=str,
-        help="dataset for full training"
-    )
-    parser.add_argument(
         "--output_template", type=str,
         help="dataset for template"
     )
     parser.add_argument(
         "--output_semi", type=str,
         help="dataset for semi training"
+    )
+    parser.add_argument(
+        "--boundary_suffix", type=str,
+        help="suffix of non-template's boundary"
+    )
+    parser.add_argument(
+        "--label_suffix", type=str,
+        help="suffix of non-template's target label"
     )
     args = parser.parse_args()
     print(args)
@@ -57,52 +61,11 @@ def main():
         dataset = json.load(f)
     data = dataset["data"]
 
-    data_full = []
-    for subject in data:
-        dict_ = {
-            "label": subject["label"],
-            "subject": subject["subject"],
-            "weight": subject["weight"],
-        }
-        directory = os.path.dirname(subject["image"])
-        image_path = os.path.join(
-            directory,
-            subject["subject"] + "_preprocessed.nii.gz"
-        )
-        dict_["image"] = image_path
-        data_full.append(dict_)
-    dataset["data"] = data_full
-    with open(args.output_full, "w") as f:
-        json.dump(dataset, f, indent=4, sort_keys=True)
-
     template_list = []
     for subject in data:
         if subject["subject"] in args.templates:
-            template = {
-                "raw_image": subject["image"],
-                "label": subject["label"],
-                "onehot": subject["onehot"],
-                "subject": subject["subject"],
-                "weight": subject["weight"],
-                "template": 1
-            }
-            directory = os.path.dirname(subject["label"])
-            image_path = os.path.join(
-                directory,
-                subject["subject"] + "_preprocessed.nii.gz"
-            )
-            template["image"] = image_path
-            os.system("cp {} {}".format(subject["image"], image_path))
-            split(subject["image"], "tmp.nii.gz", subject["image"])
-            onehot_list = [
-                os.path.join(
-                    directory,
-                    subject["subject"] + "_segTRI_onehot_{}.nii.gz".format(i)
-                ) for i in range(dataset["n_classes"])
-            ]
-            onehot_encode(subject["label"], *onehot_list)
-            template["onehots"] = onehot_list
-            template_list.append(template)
+            subject["template"] = 1
+            template_list.append(subject)
 
     n_templates = len(template_list)
     dataset["data"] = template_list
@@ -112,61 +75,58 @@ def main():
     subject_list = []
 
     for subject in data:
-        if not subject["subject"] in args.templates:
-            for i, template in enumerate(template_list):
-                subject_warped_label = {
-                    "raw_image": subject["image"],
-                    "subject": subject["subject"],
-                    "template": 0,
-                    "source": template["subject"],
-                    "weight": float(subject["weight"]) / n_templates
-                }
-                directory = os.path.dirname(subject["label"])
-                image_path = os.path.join(
-                    directory, subject["subject"] + "_preprocessed.nii.gz"
-                )
-                subject_warped_label["image"] = image_path
+        warped_label_suffix = subject["label"].split(subject["subject"])[-1]
+        if subject["subject"] in args.templates:
+            continue
 
-                if i == 0:
-                    os.system("cp {} {}".format(subject["image"], image_path))
-                    split(subject["image"], "tmp.nii.gz", subject["image"])
-
-                output = os.path.join(
-                    directory,
-                    template["subject"] + "_to_" + subject["subject"] + "_segTRI_ana_0.nii.gz"
+        for template in template_list:
+            non_template = {
+                "boundary": os.path.join(
+                    subject["subject"],
+                    subject["subject"] + args.boundary_suffix
+                ),
+                "label": os.path.join(
+                    subject["subject"],
+                    subject["subject"] + "_from_" + template["subject"] + args.label_suffix
+                ),
+                "warped_label": os.path.join(
+                    subject["subject"],
+                    subject["subject"] + "_from_" + template["subject"] + warped_label_suffix
+                ),
+                "original": subject["original"],
+                "preprocessed": subject["preprocessed"],
+                "subject": subject["subject"],
+                "weight": float(subject["weight"]) / n_templates,
+                "source": template["subject"]
+            }
+            cmd = (
+                "ANTS 3 -m PR[{}, {}, 1, 2] -i 50x20x10"
+                " -t SyN[0.5] -r Gauss[3, 0.5] -o from{}to{}"
+                .format(
+                    non_template["original"],
+                    template["original"],
+                    template["subject"],
+                    non_template["subject"]
                 )
-                subject_warped_label["onehot"] = os.path.join(
-                    directory,
-                    template["subject"] + "_to_" + subject["subject"] + "_segTRI_proba.nii.gz"
+            )
+            cmd += (
+                "; antsApplyTransforms -d 3 -i {0} -r {1} -o {2} "
+                "-t from{3}to{4}Warp.nii.gz from{3}to{4}Affine.txt"
+                " -n NearestNeighbor"
+                .format(
+                    template["label"],
+                    non_template["original"],
+                    non_template["warped_label"],
+                    template["subject"],
+                    subject["subject"]
                 )
-                subject_list.append(subject_warped_label)
-                cmd = (
-                    "ANTS 3 -m PR[{}, {}, 1, 2] -i 50x20x10"
-                    " -t SyN[0.3] -r Gauss[3,0.5] -o from{}to{}"
-                    .format(
-                        subject_warped_label["raw_image"],
-                        template["raw_image"],
-                        template["subject"],
-                        subject["subject"]
-                    )
-                )
-                cmd += (
-                    "; antsApplyTransforms -d 3 -i {0} -r {1} -o {2} "
-                    "-t from{3}to{4}Warp.nii.gz from{3}to{4}Affine.txt"
-                    " -n NearestNeighbor"
-                    .format(
-                        template["label"],
-                        subject_warped_label["raw_image"],
-                        output,
-                        template["subject"],
-                        subject["subject"]
-                    )
-                )
-                cmd += (
-                    "; python {0}/convert.py -i {1} -t int32"
-                    .format(os.path.abspath(os.path.dirname(__file__)), output)
-                )
-                throw_with_qsub(cmd)
+            )
+            cmd += (
+                "; python {}/convert.py -i {} -t int32"
+                .format(os.path.abspath(os.path.dirname(__file__)), non_template["warped_label"])
+            )
+            throw_with_qsub(cmd)
+            subject_list.append(non_template)
 
     dataset["data"] = template_list + subject_list
 
