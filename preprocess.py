@@ -10,7 +10,7 @@ from scipy.ndimage.filters import gaussian_filter
 import SimpleITK as sitk
 
 
-def preprocess_img(inputfile, outputfile):
+def preprocess_img(inputfile, output_original, output_preprocessed):
     img = nib.load(inputfile)
     data = img.get_data()
     affine = img.affine
@@ -18,6 +18,7 @@ def preprocess_img(inputfile, outputfile):
     data, affine = reslice(data, affine, zoom, (1., 1., 1.), 1)
     data = np.squeeze(data)
     data = np.pad(data, [(0, 256 - len_) for len_ in data.shape], "constant")
+    nib.save(nib.Nifti1Image(data, affine), output_original)
 
     data_sub = data - gaussian_filter(data, sigma=1)
     img = sitk.GetImageFromArray(np.copy(data_sub))
@@ -31,12 +32,12 @@ def preprocess_img(inputfile, outputfile):
     data = np.float32(data)
 
     img = nib.Nifti1Image(data, affine)
-    nib.save(img, outputfile)
+    nib.save(img, output_preprocessed)
 
 
 def preprocess_label(inputfile,
-                     outputfile,
-                     output_onehot,
+                     output_label,
+                     output_boundary,
                      n_classes,
                      df=None,
                      input_key=None,
@@ -55,13 +56,18 @@ def preprocess_label(inputfile,
             tmp[np.where(data == source)] = target
         data = tmp
     data = np.int32(data)
+    assert np.max(data) < n_classes
     img = nib.Nifti1Image(data, affine)
-    nib.save(img, outputfile)
+    nib.save(img, output_label)
 
     data = np.eye(n_classes)[data]
-    data = data.astype(np.float32)
-    img = nib.Nifti1Image(data, affine)
-    nib.save(img, output_onehot)
+    assert data.shape == img.shape + (n_classes,)
+    data_list = np.gradient(data, axis=(0, 1, 2))
+    data = np.sqrt(data_list[0] ** 2 + data_list[1] ** 2 + data_list[2] ** 2)
+    data = np.sum(data, axis=-1)
+    data = np.float32(data)
+    assert data.shape == img.shape
+    nib.save(nib.Nifti1Image(data, affine), output_boundary)
 
 
 def main():
@@ -79,12 +85,20 @@ def main():
         help="sample weight for each subject"
     )
     parser.add_argument(
-        "--image_suffix", type=str,
-        help="suffix of images"
+        "--input_image_suffix", type=str,
+        help="suffix of input images"
     )
     parser.add_argument(
-        "--label_suffix", type=str,
-        help="suffix of labels"
+        "--output_image_suffix", type=str,
+        help="suffix of output images"
+    )
+    parser.add_argument(
+        "--input_label_suffix", type=str,
+        help="suffix of input labels"
+    )
+    parser.add_argument(
+        "--output_label_suffix", type=str,
+        help="suffix of output labels"
     )
     parser.add_argument(
         "--onehot_suffix", type=str,
@@ -129,27 +143,42 @@ def main():
             os.makedirs(subject)
         filedict = {"subject": subject, "weight": weight}
 
-        if args.image_suffix is not None:
-            filename = subject + args.image_suffix
-            outputfile = os.path.join(subject, filename)
-            filedict["image"] = outputfile
+        if args.input_image_suffix is not None:
+            filedict["original"] = os.path.join(
+                subject,
+                subject + args.input_image_suffix
+            )
+            filedict["preprocessed"] = os.path.join(
+                subject,
+                subject + args.output_image_suffix
+            )
             preprocess_img(
-                os.path.join(args.input_directory, subject, filename),
-                outputfile
+                os.path.join(
+                    args.input_directory,
+                    subject,
+                    subject + args.input_image_suffix
+                ),
+                filedict["original"],
+                filedict["preprocessed"]
             )
 
-        if args.label_suffix is not None:
-            filename = subject + args.label_suffix
-            outputfile = os.path.join(subject, filename)
-            outputfile_onehot = (
-                subject + "/" + subject + args.onehot_suffix
+        if args.input_label_suffix is not None:
+            filedict["label"] = os.path.join(
+                subject,
+                subject + args.input_label_suffix
             )
-            filedict["label"] = outputfile
-            filedict["onehot"] = outputfile_onehot
+            filedict["boundary"] = os.path.join(
+                subject,
+                subject + args.output_label_suffix
+            )
             preprocess_label(
-                os.path.join(args.input_directory, subject, filename),
-                outputfile,
-                outputfile_onehot,
+                os.path.join(
+                    args.input_directory,
+                    subject,
+                    subject + args.input_label_suffix
+                ),
+                filedict["label"],
+                filedict["boundary"],
                 args.n_classes,
                 df=df,
                 input_key=args.input_key,
