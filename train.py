@@ -1,5 +1,4 @@
 import argparse
-import itertools
 import json
 
 import chainer
@@ -13,7 +12,7 @@ from utils import load_sample, load_nifti, dice_coefficients, feedforward
 
 def validate(model, df, input_shape, output_shape, n_tiles, n_classes):
     dice_coefs = []
-    for image_path, label_path in zip(df["image"], df["label"]):
+    for image_path, label_path in zip(df["preprocessed"], df["label"]):
         image = load_nifti(image_path)
         label = load_nifti(label_path)
         output = feedforward(
