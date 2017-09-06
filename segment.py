@@ -52,7 +52,7 @@ def main():
         chainer.cuda.get_device_from_id(args.gpu).use()
         vrn.to_gpu()
 
-    for image_path, subject in zip(test_df["image"], test_df["subject"]):
+    for image_path, subject in zip(test_df["preprocessed"], test_df["subject"]):
         image, affine = load_nifti(image_path, with_affine=True)
         output = feedforward(
             vrn,
