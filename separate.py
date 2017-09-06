@@ -50,10 +50,6 @@ def main():
         "--boundary_suffix", type=str,
         help="suffix of non-template's boundary"
     )
-    parser.add_argument(
-        "--label_suffix", type=str,
-        help="suffix of non-template's target label"
-    )
     args = parser.parse_args()
     print(args)
 
@@ -75,7 +71,7 @@ def main():
     subject_list = []
 
     for subject in data:
-        warped_label_suffix = subject["label"].split(subject["subject"])[-1]
+        label_suffix = subject["label"].split(subject["subject"])[-1]
         if subject["subject"] in args.templates:
             continue
 
@@ -87,17 +83,14 @@ def main():
                 ),
                 "label": os.path.join(
                     subject["subject"],
-                    subject["subject"] + "_from_" + template["subject"] + args.label_suffix
-                ),
-                "warped_label": os.path.join(
-                    subject["subject"],
-                    subject["subject"] + "_from_" + template["subject"] + warped_label_suffix
+                    subject["subject"] + "_from_" + template["subject"] + label_suffix
                 ),
                 "original": subject["original"],
                 "preprocessed": subject["preprocessed"],
                 "subject": subject["subject"],
                 "weight": float(subject["weight"]) / n_templates,
-                "source": template["subject"]
+                "source": template["subject"],
+                "template": 0
             }
             cmd = (
                 "ANTS 3 -m PR[{}, {}, 1, 2] -i 50x20x10"
@@ -116,14 +109,14 @@ def main():
                 .format(
                     template["label"],
                     non_template["original"],
-                    non_template["warped_label"],
+                    non_template["label"],
                     template["subject"],
                     subject["subject"]
                 )
             )
             cmd += (
                 "; python {}/convert.py -i {} -t int32"
-                .format(os.path.abspath(os.path.dirname(__file__)), non_template["warped_label"])
+                .format(os.path.abspath(os.path.dirname(__file__)), non_template["label"])
             )
             throw_with_qsub(cmd)
             subject_list.append(non_template)
