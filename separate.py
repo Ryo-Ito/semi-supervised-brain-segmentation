@@ -1,23 +1,6 @@
 import argparse
 import json
 import os
-import nibabel as nib
-import numpy as np
-
-
-def onehot_encode(inputfile, *outputfile):
-    img = nib.load(inputfile)
-    data = img.get_data()
-    labels = np.unique(data)
-    for label, out in zip(labels, outputfile):
-        nib.save(nib.Nifti1Image((data == label).astype(np.float32), img.affine), out)
-
-
-def split(inputfile, *outputfile):
-    img = nib.load(inputfile)
-    data = img.get_data().transpose(3, 0, 1, 2)
-    for out, d in zip(outputfile, data):
-        nib.save(nib.Nifti1Image(d.astype(np.float32), img.affine), out)
 
 
 def throw_with_qsub(cmd):
@@ -116,7 +99,10 @@ def main():
             )
             cmd += (
                 "; python {}/convert.py -i {} -t int32"
-                .format(os.path.abspath(os.path.dirname(__file__)), non_template["label"])
+                .format(
+                    os.path.abspath(os.path.dirname(__file__)),
+                    non_template["label"]
+                )
             )
             throw_with_qsub(cmd)
             subject_list.append(non_template)
