@@ -152,8 +152,8 @@ def feedforward(model, image, input_shape, output_shape, n_tiles, n_classes):
         patch = np.expand_dims(patch, 0)
         patch = model.xp.asarray(patch)
         slices_out = [slice(None)] + [
-                slice(center - len_out // 2, center + len_out // 2)
-                for len_out, center in zip(output_shape, [x, y, z])
+            slice(center - len_out // 2, center + len_out // 2)
+            for len_out, center in zip(output_shape, [x, y, z])
         ]
         slices_in = [0, slice(None)] + [
             slice((len_in - len_out) // 2, (len_out - len_in) // 2)
