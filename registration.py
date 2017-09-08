@@ -14,7 +14,7 @@ def throw_with_qsub(cmd):
 
 def perform_registration(dataframe):
 
-    for fixed_subject, fixed_image, fixed_boundary, output_label, source, istemplate in zip(dataframe["preprocessed"], dataframe["boundary"], dataframe["label"], dataframe["source"], dataframe["template"]):
+    for fixed_subject, fixed_image, fixed_boundary, output_label, source, istemplate in zip(dataframe["subject"], dataframe["preprocessed"], dataframe["boundary"], dataframe["label"], dataframe["source"], dataframe["template"]):
         if istemplate:
             continue
 
