@@ -10,12 +10,12 @@ from scipy.ndimage.filters import gaussian_filter
 import SimpleITK as sitk
 
 
-def preprocess_img(inputfile, output_original, output_preprocessed):
+def preprocess_img(inputfile, output_original, output_preprocessed, zooms):
     img = nib.load(inputfile)
     data = img.get_data()
     affine = img.affine
     zoom = img.header.get_zooms()[:3]
-    data, affine = reslice(data, affine, zoom, (1., 1., 1.), 1)
+    data, affine = reslice(data, affine, zoom, zooms, 1)
     data = np.squeeze(data)
     data = np.pad(data, [(0, 256 - len_) for len_ in data.shape], "constant")
     nib.save(nib.Nifti1Image(data, affine), output_original)
@@ -39,6 +39,7 @@ def preprocess_label(inputfile,
                      output_label,
                      output_boundary,
                      n_classes,
+                     zooms,
                      df=None,
                      input_key=None,
                      output_key=None):
@@ -46,7 +47,7 @@ def preprocess_label(inputfile,
     data = img.get_data()
     affine = img.affine
     zoom = img.header.get_zooms()[:3]
-    data, affine = reslice(data, affine, zoom, (1., 1., 1.), 0)
+    data, affine = reslice(data, affine, zoom, zooms, 0)
     data = np.squeeze(data)
     data = np.pad(data, [(0, 256 - len_) for len_ in data.shape], "constant")
 
@@ -163,7 +164,8 @@ def main():
                     subject + args.input_image_suffix
                 ),
                 filedict["original"],
-                filedict["preprocessed"]
+                filedict["preprocessed"],
+                args.zooms
             )
 
         if args.input_label_suffix is not None:
@@ -184,6 +186,7 @@ def main():
                 filedict["label"],
                 filedict["boundary"],
                 args.n_classes,
+                args.zooms,
                 df=df,
                 input_key=args.input_key,
                 output_key=args.output_key
