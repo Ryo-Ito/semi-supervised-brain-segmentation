@@ -2,6 +2,7 @@ import argparse
 import nibabel as nib
 import numpy as np
 
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", "-i")
@@ -30,6 +31,7 @@ def main():
         data = data.astype(np.int32)
 
     nib.save(nib.Nifti1Image(data, img.affine), args.input)
+
 
 if __name__ == '__main__':
     main()
