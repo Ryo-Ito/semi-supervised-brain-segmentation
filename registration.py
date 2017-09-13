@@ -14,11 +14,11 @@ def throw_with_qsub(cmd):
 
 def perform_registration(dataframe):
 
-    for fixed_subject, fixed_image, fixed_boundary, output_label, source, istemplate in zip(dataframe["subject"], dataframe["preprocessed"], dataframe["boundary"], dataframe["label"], dataframe["source"], dataframe["template"]):
+    for fixed_subject, fixed_image, fixed_boundary, output_label, source, istemplate in zip(dataframe["subject"], dataframe["original"], dataframe["boundary"], dataframe["label"], dataframe["source"], dataframe["template"]):
         if istemplate:
             continue
 
-        for moving_subject, moving_image, moving_boundary, moving_label in zip(dataframe["subject"], dataframe["preprocessed"], dataframe["boundary"], dataframe["label"]):
+        for moving_subject, moving_image, moving_boundary, moving_label in zip(dataframe["subject"], dataframe["original"], dataframe["boundary"], dataframe["label"]):
             if moving_subject == source:
                 break
 
