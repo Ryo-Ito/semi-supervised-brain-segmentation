@@ -124,6 +124,10 @@ def main():
         "--n_classes", type=int,
         help="number of classes to classify"
     )
+    parser.add_argument(
+        "--zooms", type=float, nargs="*", action="store", default=[1., 1., 1.],
+        help="zooming resolution"
+    )
     args = parser.parse_args()
     if args.weights is None:
         args.weights = [1. for _ in args.subjects]
