@@ -18,7 +18,7 @@ def preprocess_img(inputfile, output_original, output_preprocessed, zooms):
     data, affine = reslice(data, affine, zoom, zooms, 1)
     data = np.squeeze(data)
     data = np.pad(data, [(0, 256 - len_) for len_ in data.shape], "constant")
-    nib.save(nib.Nifti1Image(data, affine), output_original)
+    nib.save(nib.Nifti1Image(np.float32(data), affine), output_original)
 
     data_sub = data - gaussian_filter(data, sigma=1)
     img = sitk.GetImageFromArray(np.copy(data_sub))
@@ -100,10 +100,6 @@ def main():
     parser.add_argument(
         "--output_label_suffix", type=str,
         help="suffix of output labels"
-    )
-    parser.add_argument(
-        "--onehot_suffix", type=str,
-        help="suffix of onehot labels"
     )
     parser.add_argument(
         "--output_file", "-f", type=str, default="dataset.json",
