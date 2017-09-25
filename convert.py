@@ -49,7 +49,7 @@ def main():
         data = np.argmax(data, axis=-1)
         data = data.astype(np.int32)
     elif args.type == "proba":
-        data = img.get_data()
+        data = img.get_data().astype(np.int)
         data = np.eye(args.n_classes)[data]
         zoom = img.header.get_zooms()[:3]
         data = mask2proba(data, np.array(zoom) * args.coef)
