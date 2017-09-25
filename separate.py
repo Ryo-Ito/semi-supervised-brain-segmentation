@@ -33,6 +33,10 @@ def main():
         "--boundary_suffix", type=str,
         help="suffix of non-template's boundary"
     )
+    parser.add_argument(
+        "--throw_job", type=int, default=1,
+        help="flag to indicate throw job or not"
+    )
     args = parser.parse_args()
     print(args)
 
@@ -104,7 +108,10 @@ def main():
                     non_template["label"]
                 )
             )
-            throw_with_qsub(cmd)
+            if args.throw_job:
+                throw_with_qsub(cmd)
+            else:
+                os.system(cmd)
             subject_list.append(non_template)
 
     dataset["data"] = template_list + subject_list
