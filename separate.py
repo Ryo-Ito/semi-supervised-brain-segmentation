@@ -30,8 +30,16 @@ def main():
         help="dataset for semi training"
     )
     parser.add_argument(
-        "--boundary_suffix", type=str,
-        help="suffix of non-template's boundary"
+        "--target_suffix", type=str,
+        help="suffix of target label map"
+    )
+    parser.add_argument(
+        "--proba_suffix", type=str,
+        help="suffix of propageted probability mask"
+    )
+    parser.add_argument(
+        "--coef", "-c", type=float, default=1,
+        help="coefficient of distance transform"
     )
     args = parser.parse_args()
     print(args)
@@ -46,7 +54,6 @@ def main():
             subject["template"] = 1
             template_list.append(subject)
 
-    n_templates = len(template_list)
     dataset["data"] = template_list
     with open(args.output_template, "w") as f:
         json.dump(dataset, f, indent=4, sort_keys=True)
@@ -54,27 +61,29 @@ def main():
     subject_list = []
 
     for subject in data:
-        label_suffix = subject["label"].split(subject["subject"])[-1]
         if subject["subject"] in args.templates:
             continue
 
+        non_template = {
+            "proba": [],
+            "label": os.path.join(
+                subject["subject"],
+                subject["subject"] + args.target_suffix
+            ),
+            "original": subject["original"],
+            "preprocessed": subject["preprocessed"],
+            "subject": subject["subject"],
+            "weight": subject["weight"],
+            "template": 0
+        }
+
         for template in template_list:
-            non_template = {
-                "boundary": os.path.join(
+            non_template["proba"].append(
+                os.path.join(
                     subject["subject"],
-                    subject["subject"] + args.boundary_suffix
-                ),
-                "label": os.path.join(
-                    subject["subject"],
-                    subject["subject"] + "_from_" + template["subject"] + label_suffix
-                ),
-                "original": subject["original"],
-                "preprocessed": subject["preprocessed"],
-                "subject": subject["subject"],
-                "weight": float(subject["weight"]) / n_templates,
-                "source": template["subject"],
-                "template": 0
-            }
+                    subject["subject"] + "_from_" + template["subject"] + args.proba_suffix
+                )
+            )
             cmd = (
                 "ANTS 3 -m PR[{}, {}, 1, 2] -i 50x20x10"
                 " -t SyN[0.5] -r Gauss[3, 0.5] -o from{}to{}"
@@ -92,16 +101,18 @@ def main():
                 .format(
                     template["label"],
                     non_template["original"],
-                    non_template["label"],
+                    non_template["proba"][-1],
                     template["subject"],
                     subject["subject"]
                 )
             )
             cmd += (
-                "; python {}/convert.py -i {} -t int32"
+                "; python {}/convert.py -i {} -t proba -n {} -c {}"
                 .format(
                     os.path.abspath(os.path.dirname(__file__)),
-                    non_template["label"]
+                    non_template["proba"][-1],
+                    dataset["n_classes"],
+                    args.coef
                 )
             )
             throw_with_qsub(cmd)

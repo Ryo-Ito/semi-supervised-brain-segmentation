@@ -37,7 +37,6 @@ def preprocess_img(inputfile, output_original, output_preprocessed, zooms):
 
 def preprocess_label(inputfile,
                      output_label,
-                     output_boundary,
                      n_classes,
                      zooms,
                      df=None,
@@ -60,15 +59,6 @@ def preprocess_label(inputfile,
     assert np.max(data) < n_classes
     img = nib.Nifti1Image(data, affine)
     nib.save(img, output_label)
-
-    data = np.eye(n_classes)[data]
-    assert data.shape == img.shape + (n_classes,)
-    data_list = np.gradient(data, axis=(0, 1, 2))
-    data = np.sqrt(data_list[0] ** 2 + data_list[1] ** 2 + data_list[2] ** 2)
-    data = np.sum(data, axis=-1)
-    data = np.float32(data)
-    assert data.shape == img.shape
-    nib.save(nib.Nifti1Image(data, affine), output_boundary)
 
 
 def main():
@@ -94,12 +84,8 @@ def main():
         help="suffix of output images"
     )
     parser.add_argument(
-        "--input_label_suffix", type=str,
-        help="suffix of input labels"
-    )
-    parser.add_argument(
-        "--output_label_suffix", type=str,
-        help="suffix of output labels"
+        "--label_suffix", type=str,
+        help="suffix of labels"
     )
     parser.add_argument(
         "--output_file", "-f", type=str, default="dataset.json",
@@ -164,23 +150,18 @@ def main():
                 args.zooms
             )
 
-        if args.input_label_suffix is not None:
+        if args.label_suffix is not None:
             filedict["label"] = os.path.join(
                 subject,
-                subject + args.input_label_suffix
-            )
-            filedict["boundary"] = os.path.join(
-                subject,
-                subject + args.output_label_suffix
+                subject + args.label_suffix
             )
             preprocess_label(
                 os.path.join(
                     args.input_directory,
                     subject,
-                    subject + args.input_label_suffix
+                    subject + args.label_suffix
                 ),
                 filedict["label"],
-                filedict["boundary"],
                 args.n_classes,
                 args.zooms,
                 df=df,
