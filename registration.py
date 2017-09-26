@@ -12,7 +12,7 @@ def throw_with_qsub(cmd):
     os.system(cmd)
 
 
-def perform_registration(dataframe):
+def perform_registration(dataframe, throw_job):
 
     for fixed_subject, fixed_image, fixed_boundary, output_label, source, istemplate in zip(dataframe["subject"], dataframe["original"], dataframe["boundary"], dataframe["label"], dataframe["source"], dataframe["template"]):
         if istemplate:
@@ -36,7 +36,10 @@ def perform_registration(dataframe):
             .format(os.path.abspath(os.path.dirname(__file__)), output_label)
         )
         print(fixed_subject, moving_subject)
-        throw_with_qsub(cmd)
+        if throw_job:
+            throw_with_qsub(cmd)
+        else:
+            os.system(cmd)
 
 
 def main():
@@ -44,6 +47,9 @@ def main():
     parser.add_argument(
         "--input_file", "-i", type=str, default="dataset_train_semi.json",
         help="input json file")
+    parser.add_argument(
+        "--throw_job", type=int, default=1,
+        help="flag indicating whether to throw job or not")
     args = parser.parse_args()
     print(args)
 
@@ -51,7 +57,8 @@ def main():
         dataset = json.load(f)
     dataframe = pd.DataFrame(dataset["data"])
 
-    perform_registration(dataframe)
+    perform_registration(dataframe, args.throw_job)
+
 
 if __name__ == '__main__':
     main()
