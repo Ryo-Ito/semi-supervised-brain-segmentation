@@ -42,15 +42,18 @@ def main():
             subject["subject"] + args.proba_suffix
         )
         img = nib.load(prior_path)
-        prior = img.get_data()
+        prior = img.get_data().astype(np.float)
+        np.clip(prior, 1e-8, 1., out=prior)
         log_posterior = np.log(prior)
 
         for obs in subject["proba"]:
-            log_posterior += np.log(nib.load(obs).get_data())
+            likelihood = nib.load(obs).get_data().astype(np.float)
+            np.clip(likelihood, 1e-8, 1., out=likelihood)
+            log_posterior += np.log(likelihood)
 
         posterior = softmax(log_posterior)
         posterior = posterior.astype(np.float32)
-        argmax = posterior.argmax(axis=-1)
+        argmax = posterior.argmax(axis=-1).astype(np.int32)
         nib.save(nib.Nifti1Image(argmax, img.affine), subject["label"])
         if args.posterior_suffix is not None:
             nib.save(
