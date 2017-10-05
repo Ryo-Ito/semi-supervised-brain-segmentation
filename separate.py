@@ -116,7 +116,7 @@ def main():
                 )
             )
             throw_with_qsub(cmd)
-            subject_list.append(non_template)
+        subject_list.append(non_template)
 
     dataset["data"] = template_list + subject_list
 
