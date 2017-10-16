@@ -34,6 +34,7 @@ def main():
         help="coefficient of distance transform"
     )
     args = parser.parse_args()
+    print(args)
 
     img = nib.load(args.input)
     if args.type == "int32":
