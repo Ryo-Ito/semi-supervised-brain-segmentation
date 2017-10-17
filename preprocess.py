@@ -10,14 +10,14 @@ from scipy.ndimage.filters import gaussian_filter
 import SimpleITK as sitk
 
 
-def preprocess_img(inputfile, output_original, output_preprocessed, zooms):
+def preprocess_img(inputfile, output_original, output_preprocessed, zooms, size):
     img = nib.load(inputfile)
     data = img.get_data()
     affine = img.affine
     zoom = img.header.get_zooms()[:3]
     data, affine = reslice(data, affine, zoom, zooms, 1)
     data = np.squeeze(data)
-    data = np.pad(data, [(0, 256 - len_) for len_ in data.shape], "constant")
+    data = np.pad(data, [(0, size - len_) for len_ in data.shape], "constant")
     nib.save(nib.Nifti1Image(np.float32(data), affine), output_original)
 
     data_sub = data - gaussian_filter(data, sigma=1)
@@ -39,6 +39,7 @@ def preprocess_label(inputfile,
                      output_label,
                      n_classes,
                      zooms,
+                     size,
                      df=None,
                      input_key=None,
                      output_key=None):
@@ -48,7 +49,7 @@ def preprocess_label(inputfile,
     zoom = img.header.get_zooms()[:3]
     data, affine = reslice(data, affine, zoom, zooms, 0)
     data = np.squeeze(data)
-    data = np.pad(data, [(0, 256 - len_) for len_ in data.shape], "constant")
+    data = np.pad(data, [(0, size - len_) for len_ in data.shape], "constant")
 
     if df is not None:
         tmp = np.zeros_like(data)
@@ -111,6 +112,10 @@ def main():
         "--zooms", type=float, nargs="*", action="store", default=[1., 1., 1.],
         help="zooming resolution"
     )
+    parser.add_argument(
+        "--size", type=int, default=256,
+        help="size of image"
+    )
     args = parser.parse_args()
     if args.weights is None:
         args.weights = [1. for _ in args.subjects]
@@ -147,7 +152,8 @@ def main():
                 ),
                 filedict["original"],
                 filedict["preprocessed"],
-                args.zooms
+                args.zooms,
+                args.size
             )
 
         if args.label_suffix is not None:
@@ -164,6 +170,7 @@ def main():
                 filedict["label"],
                 args.n_classes,
                 args.zooms,
+                args.size,
                 df=df,
                 input_key=args.input_key,
                 output_key=args.output_key
