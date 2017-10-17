@@ -22,16 +22,24 @@ def main():
         help="non-labeled dataset"
     )
     parser.add_argument(
-        "--output_full", type=str,
-        help="dataset for full training set"
-    )
-    parser.add_argument(
         "--output_semi", type=str,
         help="dataset for semi-supervised training"
     )
     parser.add_argument(
-        "--boundary_suffix", type=str,
-        help="suffix of non-template's boundary image"
+        "--target_suffix", type=str,
+        help="suffix of target label map"
+    )
+    parser.add_argument(
+        "--proba_suffix", type=str,
+        help="suffix of propageted probability mask"
+    )
+    parser.add_argument(
+        "--coef", "-c", type=float, default=1,
+        help="coefficient of distance transform"
+    )
+    parser.add_argument(
+        "--throw_job", type=int, default=1,
+        help="flag indicating to throw job or not"
     )
     args = parser.parse_args()
     print(args)
@@ -44,42 +52,38 @@ def main():
         dataset = json.load(f)
     data = dataset["data"]
 
-    dataset["data"] = data_template + data
-    with open(args.output_full, "w") as f:
-        json.dump(dataset, f, indent=4, sort_keys=True)
-
     subject_list = []
 
     for subject in data:
+        non_template = {
+            "proba": [],
+            "label": os.path.join(
+                subject["subject"],
+                subject["subject"] + args.target_suffix
+            ),
+            "original": subject["original"],
+            "preprocessed": subject["preprocessed"],
+            "subject": subject["subject"],
+            "weight": subject["weight"],
+            "template": 0
+        }
+
         for template in data_template:
-            label_suffix = template["label"].split(template["subject"])[-1]
-            subject_ = {
-                # predicted label boundary
-                "boundary": os.path.join(
+            non_template["proba"].append(
+                os.path.join(
                     subject["subject"],
-                    subject["subject"] + args.boundary_suffix
-                ),
-                # transferred label map from template
-                "label": os.path.join(
-                    subject["subject"],
-                    subject["subject"] + "_from_" + template["subject"] + label_suffix
-                ),
-                "original": subject["original"],
-                "preprocessed": subject["preprocessed"],
-                "subject": subject["subject"],
-                "weight": float(subject["weight"]) / len(data_template),
-                "source": template["subject"],
-                "template": 0
-            }
+                    subject["subject"] + "_from_" + template["subject"] + args.proba_suffix
+                )
+            )
 
             cmd = (
                 "ANTS 3 -m CC[{}, {}, 1, 2] -i 50x20x10"
                 " -t SyN[0.5] -r Gauss[3, 0.5] -o from{}to{}"
                 .format(
-                    subject_["original"],
+                    non_template["original"],
                     template["original"],
                     template["subject"],
-                    subject_["subject"]
+                    non_template["subject"]
                 )
             )
             cmd += (
@@ -88,21 +92,24 @@ def main():
                 " -n NearestNeighbor"
                 .format(
                     template["label"],
-                    subject_["original"],
-                    subject_["label"],
+                    non_template["original"],
+                    non_template["proba"][-1],
                     template["subject"],
                     subject["subject"]
                 )
             )
             cmd += (
-                "; python {}/convert.py -i {} -t int32"
+                "; python {}/convert.py -i {} -t proba -n {} -c {}"
                 .format(
                     os.path.abspath(os.path.dirname(__file__)),
-                    subject_["label"]
+                    non_template["proba"][-1],
+                    dataset["n_classes"],
+                    args.coef
                 )
             )
-            throw_with_qsub(cmd)
-            subject_list.append(subject_)
+            if args.throw_job:
+                throw_with_qsub(cmd)
+        subject_list.append(non_template)
 
     dataset["data"] = data_template + subject_list
 
