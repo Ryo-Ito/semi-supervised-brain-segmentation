@@ -75,6 +75,7 @@ def main():
                     subject["subject"] + "_from_" + template["subject"] + args.proba_suffix
                 )
             )
+            label_suffix = template["label"].split(template["subject"])[-1]
 
             cmd = (
                 "ANTS 3 -m CC[{}, {}, 1, 2] -i 50x20x10"
@@ -96,6 +97,13 @@ def main():
                     non_template["proba"][-1],
                     template["subject"],
                     subject["subject"]
+                )
+            )
+            cmd += (
+                "; cp {} {}"
+                .format(
+                    non_template["proba"][-1],
+                    non_template["label"]
                 )
             )
             cmd += (
