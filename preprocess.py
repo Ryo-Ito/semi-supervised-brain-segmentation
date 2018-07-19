@@ -13,6 +13,7 @@ import SimpleITK as sitk
 def preprocess_img(inputfile, output_original, output_preprocessed, zooms, size):
     img = nib.load(inputfile)
     data = img.get_data()
+    data = data.astype(np.float)
     affine = img.affine
     zoom = img.header.get_zooms()[:3]
     data, affine = reslice(data, affine, zoom, zooms, 1)

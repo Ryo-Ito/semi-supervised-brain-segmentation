@@ -7,14 +7,12 @@ import numpy as np
 import pandas as pd
 
 from model import VoxResNet
-from utils import load_sample, load_nifti, dice_coefficients, feedforward
+from utils import load_sample_from_pairs, load_nifti, dice_coefficients, feedforward
 
 
-def validate(model, df, input_shape, output_shape, n_tiles, n_classes):
+def validate(model, val_image, val_label, input_shape, output_shape, n_tiles, n_classes):
     dice_coefs = []
-    for image_path, label_path in zip(df["preprocessed"], df["label"]):
-        image = load_nifti(image_path)
-        label = load_nifti(label_path)
+    for image, label in zip(val_image, val_label):
         output = feedforward(
             model,
             image,
@@ -77,10 +75,15 @@ def main():
     with open(args.input_file) as f:
         dataset = json.load(f)
     train_df = pd.DataFrame(dataset["data"])
+    image_train = [load_nifti(path) for path in train_df["preprocessed"]]
+    label_train = [load_nifti(path) for path in train_df["label"]]
+    weight_train = np.asarray(train_df["weight"])
     if args.validation_file is not None:
         with open(args.validation_file) as f:
             dataset_val = json.load(f)
         df_val = pd.DataFrame(dataset_val["data"])
+        val_image = [load_nifti(img_path) for img_path in df_val["preprocessed"]]
+        val_label = [load_nifti(label_path) for label_path in df_val["label"]]
         val_score = 0
 
     vrn = VoxResNet(dataset["in_channels"], dataset["n_classes"])
@@ -98,12 +101,20 @@ def main():
     ]
     for i in range(args.iteration):
         vrn.cleargrads()
-        image, label = load_sample(
-            train_df,
+        image, label = load_sample_from_pairs(
+            image_train,
+            label_train,
+            weight_train,
             args.n_batch,
             args.input_shape,
             args.output_shape
         )
+        # image, label = load_sample(
+        #     train_df,
+        #     args.n_batch,
+        #     args.input_shape,
+        #     args.output_shape
+        # )
         x_train = vrn.xp.asarray(image)
         y_train = vrn.xp.asarray(label)
         logits = vrn(x_train, train=True)
@@ -122,7 +133,8 @@ def main():
             if args.validation_file is not None:
                 dice_coefs = validate(
                     vrn,
-                    df_val,
+                    val_image,
+                    val_label,
                     args.input_shape,
                     args.output_shape,
                     args.n_tiles,
@@ -136,13 +148,15 @@ def main():
                 print(
                     f"step {i:5d}",
                     f"val/dice {mean_dice_coefs:.02f}",
-                    sep=", "
+                    sep=", ",
+                    flush=True
                 )
 
     if args.validation_file is not None:
         dice_coefs = validate(
             vrn,
-            df_val,
+            val_image,
+            val_label,
             args.input_shape,
             args.output_shape,
             args.n_tiles,
